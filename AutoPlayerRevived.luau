@@ -223,6 +223,13 @@ ExtrasFolder:AddButton({
     end,
 })
 ExtrasFolder:AddButton({
+    Name = 'Instant Solo',
+    Callback = function()
+        local sp = Client.PlayerGui:WaitForChild('SingleplayerUI', 2)
+        if sp then sp.ButtonPressed:FireServer() end
+    end,
+})
+ExtrasFolder:AddButton({
     Name = 'Reload',
     Callback = function()
         pcall(function()
