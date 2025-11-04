@@ -361,13 +361,30 @@ function onChildAdded(Object)
                 VirtualInputManager:SendKeyEvent(true, keyCode, false, nil)
                 laneDown[Holder] = true
             end
-            local Bar = Arrow.Frame and Arrow.Frame:FindFirstChild('Bar')
+            local Bar
+            do
+                local f = Arrow.Frame
+                Bar = f and f:FindFirstChild('Bar')
+            end
+
             if Bar then
-                while Bar.Size.Y.Scale >= 0.6 do
+                while
+                    Arrow
+                    and Arrow.Parent
+                    and Arrow.Visible
+                    and Bar
+                    and Bar.Size
+                    and Bar.Size.Y
+                    and (Bar.Size.Y.Scale > 0.02)
+                do
                     if not Library.Flags['hello'].Value then
                         break
                     end
-                    wait()
+                    local f = Arrow:FindFirstChild('Frame')
+                    if f then
+                        Bar = f:FindFirstChild('Bar')
+                    end
+                    task.wait()
                 end
             end
             laneCount[Holder] = laneCount[Holder] - 1
