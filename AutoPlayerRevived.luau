@@ -2,16 +2,17 @@ if not game:IsLoaded() then
     game.Loaded:Wait()
 end
 local connections = {
+    _list = {},
     add = function(self, signal, onFire)
-        self[#self + 1] = signal:Connect(onFire)
+        self._list[#self._list + 1] = signal:Connect(onFire)
     end,
     disconnect = function(self)
-        for i, v in pairs(self) do
+        for i, v in pairs(self._list) do
             if type(v) == 'userdata' and v.Connected then
                 v:Disconnect()
             end
         end
-        table.clear(self)
+        table.clear(self._list)
     end,
 }
 local spLimit = 2
@@ -226,7 +227,9 @@ ExtrasFolder:AddButton({
     Name = 'Instant Solo',
     Callback = function()
         local sp = Client.PlayerGui:WaitForChild('SingleplayerUI', 2)
-        if sp then sp.ButtonPressed:FireServer() end
+        if sp then
+            sp.ButtonPressed:FireServer()
+        end
     end,
 })
 ExtrasFolder:AddButton({
