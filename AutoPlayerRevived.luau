@@ -572,6 +572,8 @@ for _, v in pairs(workspace:GetDescendants()) do
     end
 end
 
+Rayfield:LoadConfiguration()
+
 if Input.Keybinds.R4.Value == ';' then
     game:GetService('ReplicatedStorage').Events.RemoteEvent
         :FireServer('Input', 'Semicolon', 'R4')
