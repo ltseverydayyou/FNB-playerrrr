@@ -575,6 +575,13 @@ end
 Rayfield:LoadConfiguration()
 
 if Input.Keybinds.R4.Value == ';' then
-    game:GetService('ReplicatedStorage').Events.RemoteEvent
-        :FireServer('Input', 'Semicolon', 'R4')
+    local ReplicatedStorage = game:GetService('ReplicatedStorage')
+
+    local RE = ReplicatedStorage.Modules.Network.RE
+
+    RE:FireServer('REMOTE_EVENT', {
+        buffer.fromstring('"Input"'),
+        buffer.fromstring('"Semicolon"'),
+        buffer.fromstring('"R4"'),
+    })
 end
