@@ -147,6 +147,7 @@ local TabKeybinds = Window:CreateTab('Keybinds', 6472846460)
 if IsOnMobile then
     TabKeybinds = nil
 end
+
 local AutoEnabled = true
 local OffsetMs = 0
 local ReleaseAllActiveLanes = function() end
@@ -193,7 +194,9 @@ TabMain:CreateInput({
     PlaceholderText = '0',
     RemoveTextAfterFocusLost = false,
     Callback = function(Value)
-        OffsetSlider:Set(tonumber(Value) or 0)
+        local n = tonumber(Value) or 0
+        OffsetSlider:Set(n)
+        OffsetMs = n
     end,
 })
 
@@ -219,12 +222,6 @@ TabCredits:CreateParagraph({
 TabExtras:CreateButton({
     Name = 'Unload script',
     Callback = function()
-        pcall(function()
-            local f = Rayfield.Flags['hello']
-            if f then
-                f.CurrentValue = false
-            end
-        end)
         AutoEnabled = false
         pcall(ReleaseAllActiveLanes)
         connections:disconnect()
@@ -270,18 +267,6 @@ if TabKeybinds then
                 :FireServer()
         end,
     })
-end
-
-Rayfield:LoadConfiguration()
-do
-    local f = Rayfield.Flags['hello']
-    if f then
-        AutoEnabled = (f.CurrentValue == true)
-    end
-    local m = Rayfield.Flags['ms']
-    if m then
-        OffsetMs = tonumber(m.CurrentValue) or 0
-    end
 end
 
 local function notifyMissing(title, content)
@@ -380,10 +365,12 @@ onChildAdded = function(Object)
         end
         return t
     end
+
     local Stage = Object.Engine.Stage.Value
     while not Stage.Config.Song.Value do
         Object.Engine.Config.TimePast.Changed:Wait()
     end
+
     local Song = Stage.Config.Song.Value
     local PoisonNotes
     local ScrollSpeed = (
@@ -395,6 +382,7 @@ onChildAdded = function(Object)
             local ps = s and s:FindFirstChild('PlaybackSpeed')
             return (ps and tonumber(ps.Value)) or 1
         end)()
+
     local baseOffset = (
         (Offsets[string.format('%.1f', ScrollSpeed)] or 0) / 1000
     ) + 0.4
@@ -402,6 +390,7 @@ onChildAdded = function(Object)
     local IncomingNotes = Filter(Arrows.IncomingNotes:GetChildren(), function(v)
         return not string.find(v.Name, '|') and v or nil
     end)
+
     if Song then
         PoisonNotes = (
             Song.Parent:FindFirstChild('MultiplieGimmickNotes')
@@ -411,11 +400,13 @@ onChildAdded = function(Object)
             or {}
         ).Value == 'OnHit'
     end
+
     local Map = Keys[#IncomingNotes] or {}
     local Session = {}
     for kn, kv in pairs(Map) do
         Session[kn] = Enum.KeyCode[Input.Keybinds[kv].Value]
     end
+
     if typeof(getconnections) == 'function' then
         for _, c in
             pairs(getconnections(Object.Engine.Events.UserInput.OnClientEvent))
@@ -423,9 +414,11 @@ onChildAdded = function(Object)
             c:Disable()
         end
     end
+
     local MobileButtons = Object.Engine:FindFirstChild('MobileButtons')
     local MobileContainer = MobileButtons
         and MobileButtons:FindFirstChild('Container')
+
     local function getBtn(name)
         if not IsOnMobile then
             return nil
@@ -440,6 +433,7 @@ onChildAdded = function(Object)
         end
         return b
     end
+
     local function pressLane(name, keyCode)
         if IsOnMobile then
             if typeof(firesignal) == 'function' then
@@ -454,6 +448,7 @@ onChildAdded = function(Object)
             VirtualInputManager:SendKeyEvent(true, keyCode, false, nil)
         end
     end
+
     local function releaseLane(name, keyCode)
         if IsOnMobile then
             if typeof(firesignal) == 'function' then
@@ -468,6 +463,7 @@ onChildAdded = function(Object)
             VirtualInputManager:SendKeyEvent(false, keyCode, false, nil)
         end
     end
+
     local laneDown = {}
     local laneCount = {}
     ReleaseAllActiveLanes = function()
@@ -484,6 +480,7 @@ onChildAdded = function(Object)
             laneCount[k] = 0
         end
     end
+
     for _, Holder in pairs(IncomingNotes) do
         connections:add(Holder.ChildAdded, function(Arrow)
             if not Arrow or not Arrow.Visible then
@@ -499,21 +496,45 @@ onChildAdded = function(Object)
             if IsOnHit(Arrow:FindFirstChildOfClass('ModuleScript')) then
                 return
             end
+
             local keyCode = Session[Holder.Name]
             if not keyCode then
                 return
             end
-            task.wait(baseOffset + ((OffsetMs or 0) / 1000))
+
+            task.wait(baseOffset + (OffsetMs / 1000))
             if not AutoEnabled then
                 return
             end
+
+            local f = Arrow:FindFirstChild('Frame')
+            local Bar = f and f:FindFirstChild('Bar')
+            local isHold = false
+            if Bar and Bar.Size and Bar.Size.Y then
+                isHold = Bar.Size.Y.Scale > 0.02
+            end
+
+            if not isHold and laneDown[Holder] then
+                local rehold = (laneCount[Holder] or 0) > 0
+                releaseLane(Holder.Name, keyCode)
+                game:GetService('RunService').Heartbeat:Wait()
+                pressLane(Holder.Name, keyCode)
+                game:GetService('RunService').Heartbeat:Wait()
+                if rehold then
+                    laneDown[Holder] = true
+                else
+                    releaseLane(Holder.Name, keyCode)
+                    laneDown[Holder] = false
+                end
+                return
+            end
+
             laneCount[Holder] = (laneCount[Holder] or 0) + 1
             if not laneDown[Holder] then
                 pressLane(Holder.Name, keyCode)
                 laneDown[Holder] = true
             end
-            local f = Arrow:FindFirstChild('Frame')
-            local Bar = f and f:FindFirstChild('Bar')
+
             while
                 Arrow
                 and Arrow.Parent
@@ -532,6 +553,7 @@ onChildAdded = function(Object)
                     Bar = f:FindFirstChild('Bar')
                 end
             end
+
             laneCount[Holder] = laneCount[Holder] - 1
             if laneCount[Holder] <= 0 then
                 laneCount[Holder] = 0
