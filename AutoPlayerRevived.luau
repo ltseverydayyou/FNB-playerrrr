@@ -143,9 +143,8 @@ local Window = Rayfield:CreateWindow({
 local TabMain = Window:CreateTab('Main', 4483345998)
 local TabCredits = Window:CreateTab('Credits', 2484564290)
 local TabExtras = Window:CreateTab('Extras', 7468828225)
-local TabKeybinds = IsOnMobile and nil
-    or Window:CreateTab('Keybinds', 6472846460)
-
+local TabKeybinds = Window:CreateTab('Keybinds', 6472846460)
+if IsOnMobile then TabKeybinds=nil end
 local AutoEnabled = true
 local OffsetMs = 0
 local ReleaseAllActiveLanes = function() end
