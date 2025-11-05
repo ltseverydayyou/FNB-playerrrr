@@ -271,12 +271,7 @@ local task = task
 local type = type
 
 function onChildAdded(Object)
-    if not Object then
-        return
-    end
-    if Object.Name ~= 'FNFEngine' then
-        return
-    end
+    if not Object or Object.Name ~= 'FNFEngine' then return end
     local require = require
     local function IsOnHit(_)
         return (_ ~= nil and require(_).Type == 'OnHit')
@@ -288,28 +283,30 @@ function onChildAdded(Object)
         end
         return returns
     end
+
     local Stage = Object.Engine.Stage.Value
     while not Stage.Config.Song.Value do
         Object.Engine.Config.TimePast.Changed:Wait()
     end
+
     local Song = Stage.Config.Song.Value
     local PoisonNotes
-    local ScrollSpeed = (
-        Input.ScrollSpeedChange.Value and Input.ScrollSpeed.Value
-    )
+
+    local ScrollSpeed = (Input.ScrollSpeedChange.Value and Input.ScrollSpeed.Value)
         or (function()
             local p = Song and Song.Parent
             local s = p and p:FindFirstChild('Sound')
             local ps = s and s:FindFirstChild('PlaybackSpeed')
             return (ps and tonumber(ps.Value)) or 1
         end)()
-    local baseOffset = (
-        (Offsets[string.format('%.1f', ScrollSpeed)] or 0) / 1000
-    ) + 0.4
+
+    local baseOffset = ((Offsets[string.format('%.1f', ScrollSpeed)] or 0) / 1000) + 0.4
+
     local Arrows = Object.Engine.Game[Object.Engine.PlayerSide.Value].Arrows
     local IncomingNotes = Filter(Arrows.IncomingNotes:GetChildren(), function(v)
         return not string.find(v.Name, '|') and v or nil
     end)
+
     if Song then
         PoisonNotes = (
             Song.Parent:FindFirstChild('MultiplieGimmickNotes')
@@ -318,80 +315,84 @@ function onChildAdded(Object)
             or Song:FindFirstChild('MineNotes')
             or {}
         ).Value == 'OnHit'
-        print(tostring(Song))
     end
+
     local Keybinds = Input.Keybinds
     local Session = {}
-    if Keys[#IncomingNotes] == nil then
-        print(('note count: %d'):format(#IncomingNotes))
-        warn('No keys were loaded, report to owner of the script!')
-    end
-    for kn, kv in pairs(Keys[#IncomingNotes]) do
+    for kn, kv in pairs(Keys[#IncomingNotes] or {}) do
         Session[kn] = Enum.KeyCode[Keybinds[kv].Value]
     end
-    local wait = task.wait
-    for _, connection in
-        pairs(getconnections(Object.Engine.Events.UserInput.OnClientEvent))
-    do
+
+    for _, connection in pairs(getconnections(Object.Engine.Events.UserInput.OnClientEvent)) do
         connection:Disable()
     end
+
+    local MobileButtons = Object.Engine:FindFirstChild("MobileButtons")
+    local MobileContainer = MobileButtons and MobileButtons:FindFirstChild("Container")
+
+    local function getBtn(name)
+        if not MobileContainer then return nil end
+        local b = MobileContainer:FindFirstChild(name)
+        if not b and name == "Space" then
+            b = MobileContainer:FindFirstChild("SPACE") or MobileContainer:FindFirstChild("space")
+        end
+        return b
+    end
+
+    local function pressLane(name, keyCode)
+        local b = getBtn(name)
+        if b then
+            pcall(firesignal, b.MouseButton1Down)
+        else
+            VirtualInputManager:SendKeyEvent(true, keyCode, false, nil)
+        end
+    end
+
+    local function releaseLane(name, keyCode)
+        local b = getBtn(name)
+        if b then
+            pcall(firesignal, b.MouseButton1Up)
+        else
+            VirtualInputManager:SendKeyEvent(false, keyCode, false, nil)
+        end
+    end
+
     local laneDown = {}
     local laneCount = {}
+
     for _, Holder in pairs(IncomingNotes) do
         connections:add(Holder.ChildAdded, function(Arrow)
-            if
-                Arrow.HellNote.Value and PoisonNotes
-                or IsOnHit(Arrow:FindFirstChildOfClass('ModuleScript'))
-                or not Arrow.Visible
-            then
-                return
-            end
+            if not Arrow or not Arrow.Visible then return end
+            if (Arrow:FindFirstChild("HellNote") and Arrow.HellNote.Value and PoisonNotes) then return end
+            if IsOnHit(Arrow:FindFirstChildOfClass('ModuleScript')) then return end
+
             local keyCode = Session[Holder.Name]
-            if not keyCode then
-                return
-            end
-            local localOffset = baseOffset
-                + ((Library.Flags['ms'].Value or 0) / 1000)
-            wait(localOffset)
-            if not Library.Flags['hello'].Value then
-                return
-            end
+            if not keyCode then return end
+
+            task.wait(baseOffset + ((Library.Flags['ms'].Value or 0) / 1000))
+            if not Library.Flags['hello'].Value then return end
+
             laneCount[Holder] = (laneCount[Holder] or 0) + 1
             if not laneDown[Holder] then
-                VirtualInputManager:SendKeyEvent(true, keyCode, false, nil)
+                pressLane(Holder.Name, keyCode)
                 laneDown[Holder] = true
             end
-            local Bar
-            do
-                local f = Arrow.Frame
-                Bar = f and f:FindFirstChild('Bar')
+
+            local f = Arrow:FindFirstChild("Frame")
+            local Bar = f and f:FindFirstChild("Bar")
+            while Arrow and Arrow.Parent and Arrow.Visible and Bar and Bar.Size and Bar.Size.Y
+                and (Bar.Size.Y.Scale > 0.02) do
+                if not Library.Flags['hello'].Value then break end
+                task.wait()
+                f = Arrow:FindFirstChild("Frame")
+                if f then Bar = f:FindFirstChild("Bar") end
             end
 
-            if Bar then
-                while
-                    Arrow
-                    and Arrow.Parent
-                    and Arrow.Visible
-                    and Bar
-                    and Bar.Size
-                    and Bar.Size.Y
-                    and (Bar.Size.Y.Scale > 0.02)
-                do
-                    if not Library.Flags['hello'].Value then
-                        break
-                    end
-                    local f = Arrow:FindFirstChild('Frame')
-                    if f then
-                        Bar = f:FindFirstChild('Bar')
-                    end
-                    task.wait()
-                end
-            end
             laneCount[Holder] = laneCount[Holder] - 1
             if laneCount[Holder] <= 0 then
                 laneCount[Holder] = 0
                 if laneDown[Holder] then
-                    VirtualInputManager:SendKeyEvent(false, keyCode, false, nil)
+                    releaseLane(Holder.Name, keyCode)
                     laneDown[Holder] = false
                 end
             end
