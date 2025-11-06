@@ -104,18 +104,23 @@ local function parseCredit(txt)
 end
 
 local function scan()
-	local eng=PlayerGui:FindFirstChild("FNFEngine")
-	if not eng then lobbyRPC() return end
-	local lower=eng:FindFirstChild("Engine") and eng.Engine:FindFirstChild("LowerContainer")
-	local credit=lower and lower:FindFirstChild("Credit")
-	local det,st="", ""
-	if credit and credit:IsA("TextLabel") then det,st=parseCredit(credit.Text) end
-	local mods=eng.Engine:FindFirstChild("Modifiers")
-	local ghost=mods and mods:FindFirstChild("GhostTapping")
-	local sid=tn(ghost and ghost.Image)
-	local sideVal=eng.Engine:FindFirstChild("PlayerSide") and eng.Engine.PlayerSide.Value or "L"
-	local sh="Side: "..(sideVal=="L" and "Left" or "Right")
-	rpc(det,st,picon(),pname(),sid,sh)
+    local eng=PlayerGui:FindFirstChild("FNFEngine")
+    if not eng then lobbyRPC() return end
+    local engine=eng:FindFirstChild("Engine")
+    local lower=engine and engine:FindFirstChild("LowerContainer")
+    local credit=lower and lower:FindFirstChild("Credit")
+    local det,st="",""
+    if credit and credit:IsA("TextLabel") then det,st=parseCredit(credit.Text) end
+    local sid
+    local mods=engine and engine:FindFirstChild("Modifiers")
+    local ghost=mods and mods:FindFirstChild("GhostTapping")
+    if ghost and ghost:IsA("ImageButton") and type(ghost.Image)=="string" then
+        local d=ghost.Image:match("%d+")
+        sid=d and tonumber(d) or nil
+    end
+    local sideVal=engine and engine:FindFirstChild("PlayerSide") and engine.PlayerSide.Value or "L"
+    local sh="Side: "..(sideVal=="L" and "Left" or "Right")
+    rpc(det,st,picon(),pname(),sid,sh)
 end
 
 local tAuto=TabMain:CreateToggle({
