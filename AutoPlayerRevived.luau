@@ -3,56 +3,26 @@ if not game:IsLoaded() then
 end
 if game.GameId ~= 2953945619 then return end
 
-local connections={
-    _list={},
-    add=function(self,sig,fn) self._list[#self._list+1]=sig:Connect(fn) end,
-    disconnect=function(self) for _,v in pairs(self._list) do if type(v)=='userdata' and v.Connected then v:Disconnect() end end table.clear(self._list) end,
-}
+local connections={_list={},add=function(self,s,f) self._list[#self._list+1]=s:Connect(f) end,disconnect=function(self) for _,v in pairs(self._list) do if type(v)=='userdata' and v.Connected then v:Disconnect() end end table.clear(self._list) end}
 
-local spLimit=2
-local SplashText=(math.random(1,spLimit)==1 and 'amogus') or 'fixed the autoplayer'
+local SplashText=(math.random(1,2)==1 and 'amogus') or 'fixed the autoplayer'
 
 local Client=game:GetService('Players').LocalPlayer
 local PlayerGui=Client.PlayerGui
 local UserInputService=game:GetService('UserInputService')
 local VirtualInputManager=game:GetService('VirtualInputManager')
 
-local IsOnMobile=(function()
-    local p=UserInputService:GetPlatform()
-    if p==Enum.Platform.IOS or p==Enum.Platform.Android or p==Enum.Platform.AndroidTV or p==Enum.Platform.Chromecast or p==Enum.Platform.MetaOS then return true end
-    if p==Enum.Platform.None then return UserInputService.TouchEnabled and not (UserInputService.KeyboardEnabled or UserInputService.MouseEnabled) end
-    return false
-end)()
-
-local IsOnPC=(function()
-    local p=UserInputService:GetPlatform()
-    if p==Enum.Platform.Windows or p==Enum.Platform.OSX or p==Enum.Platform.Linux or p==Enum.Platform.SteamOS or p==Enum.Platform.UWP or p==Enum.Platform.DOS or p==Enum.Platform.BeOS then return true end
-    if p==Enum.Platform.None then return UserInputService.KeyboardEnabled or UserInputService.MouseEnabled end
-    return false
-end)()
+local IsOnMobile=(function() local p=UserInputService:GetPlatform() if p==Enum.Platform.IOS or p==Enum.Platform.Android or p==Enum.Platform.AndroidTV or p==Enum.Platform.Chromecast or p==Enum.Platform.MetaOS then return true end if p==Enum.Platform.None then return UserInputService.TouchEnabled and not (UserInputService.KeyboardEnabled or UserInputService.MouseEnabled) end return false end)()
+local IsOnPC=(function() local p=UserInputService:GetPlatform() if p==Enum.Platform.Windows or p==Enum.Platform.OSX or p==Enum.Platform.Linux or p==Enum.Platform.SteamOS or p==Enum.Platform.UWP or p==Enum.Platform.DOS or p==Enum.Platform.BeOS then return true end if p==Enum.Platform.None then return UserInputService.KeyboardEnabled or UserInputService.MouseEnabled end return false end)()
 
 local Input=Client:WaitForChild('Input')
 loadstring(game:HttpGet('https://raw.githubusercontent.com/ltseverydayyou/FNB-playerrrr/refs/heads/main/uselessAhh.luau'))()
 local Offsets=loadstring(game:HttpGet('https://raw.githubusercontent.com/ltseverydayyou/FNB-playerrrr/refs/heads/main/speedManager.lua'))()
 
-local Keys={
-    [4]={Left='Left',Down='Down',Up='Up',Right='Right'},
-    [5]={Left='Left',Down='Down',Space='Space',Up='Up',Right='Right'},
-    [6]={S='L3',D='L2',F='L1',J='R1',K='R2',L='R3'},
-    [7]={S='L3',D='L2',F='L1',Space='Space',J='R1',K='R2',L='R3'},
-    [8]={A='L4',S='L3',D='L2',F='L1',H='R1',J='R2',K='R3',L='R4'},
-    [9]={A='L4',S='L3',D='L2',Space='Space',F='L1',H='R1',J='R2',K='R3',L='R4'},
-}
+local Keys={[4]={Left='Left',Down='Down',Up='Up',Right='Right'},[5]={Left='Left',Down='Down',Space='Space',Up='Up',Right='Right'},[6]={S='L3',D='L2',F='L1',J='R1',K='R2',L='R3'},[7]={S='L3',D='L2',F='L1',Space='Space',J='R1',K='R2',L='R3'},[8]={A='L4',S='L3',D='L2',F='L1',H='R1',J='R2',K='R3',L='R4'},[9]={A='L4',S='L3',D='L2',Space='Space',F='L1',H='R1',J='R2',K='R3',L='R4'}}
 
 local Rayfield=loadstring(game:HttpGet('https://raw.githubusercontent.com/ltseverydayyou/Rayfield-backup/refs/heads/main/Rayfield'))()
-local Window=Rayfield:CreateWindow({
-    Name="Friday Night Bloxxin' Autoplayer REVIVED",
-    LoadingTitle='FNB Autoplayer',
-    LoadingSubtitle=tostring(SplashText),
-    HidePremium=true,
-    DisableRayfieldPrompts=false,
-    ConfigurationSaving={Enabled=true,FolderName='ltseverydayyou-fnb'},
-})
+local Window=Rayfield:CreateWindow({Name="Friday Night Bloxxin' Autoplayer REVIVED",LoadingTitle='FNB Autoplayer',LoadingSubtitle=tostring(SplashText),HidePremium=true,DisableRayfieldPrompts=false,ConfigurationSaving={Enabled=true,FolderName='ltseverydayyou-fnb'}})
 
 local TabMain=Window:CreateTab('Main',4483345998)
 local TabCredits=Window:CreateTab('Credits',2484564290)
@@ -65,8 +35,11 @@ local HideMobileUI=false
 local curMobCont=nil
 local relAll=function() end
 local onAdd
+local Tgl
+local Sld
+local MobTgl
 
-local Tgl=TabMain:CreateToggle({
+Tgl=TabMain:CreateToggle({
     Name='Autoplayer',
     CurrentValue=true,
     Flag='hello',
@@ -79,11 +52,11 @@ if TabKeybinds then
         CurrentKeybind='End',
         Hold=false,
         Flag='helloT',
-        Callback=function() Tgl:Set(not Tgl.CurrentValue) end,
+        Callback=function() Tgl:Set(not Tgl.CurrentValue) AutoEnabled=Tgl.CurrentValue end,
     })
 end
 
-local Sld=TabMain:CreateSlider({
+Sld=TabMain:CreateSlider({
     Name='Hit offset',
     Range={-50,50},
     Increment=0.1,
@@ -101,11 +74,11 @@ TabMain:CreateInput({
 })
 
 if IsOnMobile then
-    TabMain:CreateToggle({
+    MobTgl=TabMain:CreateToggle({
         Name='Hide mobile buttons',
         CurrentValue=false,
         Flag='hmui',
-        Callback=function(v) HideMobileUI=v if IsOnMobile and curMobCont and curMobCont:IsA('GuiObject') then curMobCont.Visible=not HideMobileUI end end,
+        Callback=function(v) HideMobileUI=v if curMobCont and curMobCont:IsA('GuiObject') then curMobCont.Visible=not HideMobileUI end end,
     })
 end
 
@@ -161,31 +134,17 @@ if TabKeybinds then
         CurrentKeybind='PageDown',
         Hold=false,
         Flag='SoloKey',
-        Callback=function()
-            Client.PlayerGui:WaitForChild('SingleplayerUI').ButtonPressed:FireServer()
-        end,
+        Callback=function() Client.PlayerGui:WaitForChild('SingleplayerUI').ButtonPressed:FireServer() end,
     })
 end
 
 local function nm(t,c) Rayfield:Notify({Title=t,Content=c,Duration=7}) end
-
 do
     local miss=false
-    if not (typeof(hookmetamethod)=='function' and typeof(newcclosure)=='function' and typeof(getnamecallmethod)=='function' and typeof(checkcaller)=='function') then
-        miss=true
-        nm('Missing requirement','hookmetamethod/newcclosure/getnamecallmethod/checkcaller')
-    end
-    if typeof(getconnections)~='function' then
-        miss=true
-        nm('Missing requirement','getconnections')
-    end
-    if IsOnMobile and typeof(firesignal)~='function' then
-        miss=true
-        nm('Missing requirement','firesignal (needed on mobile)')
-    end
-    if miss then
-        nm('FNB Autoplayer','One or more requirements are missing; functionality may be limited.')
-    end
+    if not (typeof(hookmetamethod)=='function' and typeof(newcclosure)=='function' and typeof(getnamecallmethod)=='function' and typeof(checkcaller)=='function') then miss=true nm('Missing requirement','hookmetamethod/newcclosure/getnamecallmethod/checkcaller') end
+    if typeof(getconnections)~='function' then miss=true nm('Missing requirement','getconnections') end
+    if IsOnMobile and typeof(firesignal)~='function' then miss=true nm('Missing requirement','firesignal (needed on mobile)') end
+    if miss then nm('FNB Autoplayer','One or more requirements are missing; functionality may be limited.') end
 end
 
 do
@@ -221,66 +180,30 @@ onAdd=function(Object)
 
     local Song=Stage.Config.Song.Value
     local PoisonNotes
-    local ScrollSpeed=(Input.ScrollSpeedChange.Value and Input.ScrollSpeed.Value) or (function()
-        local p=Song and Song.Parent
-        local s=p and p:FindFirstChild('Sound')
-        local ps=s and s:FindFirstChild('PlaybackSpeed')
-        return (ps and tonumber(ps.Value)) or 1
-    end)()
+    local ScrollSpeed=(Input.ScrollSpeedChange.Value and Input.ScrollSpeed.Value) or (function() local p=Song and Song.Parent local s=p and p:FindFirstChild('Sound') local ps=s and s:FindFirstChild('PlaybackSpeed') return (ps and tonumber(ps.Value)) or 1 end)()
 
     local baseOffset=((Offsets[string.format('%.1f',ScrollSpeed)] or 0)/1000)+0.4
     local Arrows=Object.Engine.Game[Object.Engine.PlayerSide.Value].Arrows
     local IncomingNotes=filt(Arrows.IncomingNotes:GetChildren(),function(v) return not string.find(v.Name,'|') and v or nil end)
 
-    if Song then
-        PoisonNotes=(Song.Parent:FindFirstChild('MultiplieGimmickNotes') or Song:FindFirstChild('GimmickNotes') or Song.Parent:FindFirstChild('GimmickNotes') or Song:FindFirstChild('MineNotes') or {}).Value=='OnHit'
-    end
+    if Song then PoisonNotes=(Song.Parent:FindFirstChild('MultiplieGimmickNotes') or Song:FindFirstChild('GimmickNotes') or Song.Parent:FindFirstChild('GimmickNotes') or Song:FindFirstChild('MineNotes') or {}).Value=='OnHit' end
 
     local Map=Keys[#IncomingNotes] or {}
-    local Session={}
-    for kn,kv in pairs(Map) do Session[kn]=Enum.KeyCode[Input.Keybinds[kv].Value] end
+    local Session={} for kn,kv in pairs(Map) do Session[kn]=Enum.KeyCode[Input.Keybinds[kv].Value] end
 
-    if typeof(getconnections)=='function' then
-        for _,c in pairs(getconnections(Object.Engine.Events.UserInput.OnClientEvent)) do c:Disable() end
-    end
+    if typeof(getconnections)=='function' then for _,c in pairs(getconnections(Object.Engine.Events.UserInput.OnClientEvent)) do c:Disable() end end
 
     local MobileButtons=Object.Engine:FindFirstChild('MobileButtons')
     local MobileContainer=MobileButtons and MobileButtons:FindFirstChild('Container')
     curMobCont=MobileContainer
     if IsOnMobile and curMobCont and curMobCont:IsA('GuiObject') then curMobCont.Visible=not HideMobileUI end
 
-    local function gB(n)
-        if not IsOnMobile then return nil end
-        if not MobileContainer then return nil end
-        local b=MobileContainer:FindFirstChild(n)
-        if not b and n=='Space' then b=MobileContainer:FindFirstChild('SPACE') or MobileContainer:FindFirstChild('space') end
-        return b
-    end
+    local function gB(n) if not IsOnMobile then return nil end if not MobileContainer then return nil end local b=MobileContainer:FindFirstChild(n) if not b and n=='Space' then b=MobileContainer:FindFirstChild('SPACE') or MobileContainer:FindFirstChild('space') end return b end
+    local function pL(n,code) if IsOnMobile then if typeof(firesignal)=='function' then local b=gB(n) if b then pcall(firesignal,b.MouseButton1Down) end end return end if IsOnPC then VirtualInputManager:SendKeyEvent(true,code,false,nil) end end
+    local function rL(n,code) if IsOnMobile then if typeof(firesignal)=='function' then local b=gB(n) if b then pcall(firesignal,b.MouseButton1Up) end end return end if IsOnPC then VirtualInputManager:SendKeyEvent(false,code,false,nil) end end
 
-    local function pL(n,code)
-        if IsOnMobile then
-            if typeof(firesignal)=='function' then local b=gB(n) if b then pcall(firesignal,b.MouseButton1Down) end end
-            return
-        end
-        if IsOnPC then VirtualInputManager:SendKeyEvent(true,code,false,nil) end
-    end
-
-    local function rL(n,code)
-        if IsOnMobile then
-            if typeof(firesignal)=='function' then local b=gB(n) if b then pcall(firesignal,b.MouseButton1Up) end end
-            return
-        end
-        if IsOnPC then VirtualInputManager:SendKeyEvent(false,code,false,nil) end
-    end
-
-    local laneDown={}
-    local laneCount={}
-    relAll=function()
-        for holderName,down in pairs(laneDown) do
-            if down then local code=Session[holderName] if code then rL(holderName,code) end laneDown[holderName]=false end
-        end
-        for k in pairs(laneCount) do laneCount[k]=0 end
-    end
+    local laneDown={} local laneCount={}
+    relAll=function() for hn,down in pairs(laneDown) do if down then local code=Session[hn] if code then rL(hn,code) end laneDown[hn]=false end end for k in pairs(laneCount) do laneCount[k]=0 end end
 
     for _,Holder in pairs(IncomingNotes) do
         connections:add(Holder.ChildAdded,function(Arrow)
@@ -342,16 +265,13 @@ end
 connections:add(PlayerGui.ChildAdded,onAdd)
 task.spawn(onAdd,PlayerGui:FindFirstChild('FNFEngine'))
 
-for _,v in pairs(workspace:GetDescendants()) do
-    if v.ClassName=='ProximityPrompt' then v.HoldDuration=0 end
-end
+for _,v in pairs(workspace:GetDescendants()) do if v.ClassName=='ProximityPrompt' then v.HoldDuration=0 end end
 
 Rayfield:LoadConfiguration()
-do
-    local f=Rayfield.Flags['hello']; if f then AutoEnabled=(f.CurrentValue==true) end
-    local m=Rayfield.Flags['ms']; if m then OffsetMs=tonumber(m.CurrentValue) or 0 Sld:Set(OffsetMs) end
-    local h=Rayfield.Flags['hmui']; if h and IsOnMobile then HideMobileUI=(h.CurrentValue==true) if IsOnMobile and curMobCont and curMobCont:IsA('GuiObject') then curMobCont.Visible=not HideMobileUI end end
-end
+AutoEnabled=Tgl.CurrentValue==true
+OffsetMs=tonumber(Sld.CurrentValue) or 0
+HideMobileUI=(IsOnMobile and MobTgl and MobTgl.CurrentValue==true) or false
+if IsOnMobile and curMobCont and curMobCont:IsA('GuiObject') then curMobCont.Visible=not HideMobileUI end
 
 if Input.Keybinds.R4.Value==';' then
     local ReplicatedStorage=game:GetService('ReplicatedStorage')
