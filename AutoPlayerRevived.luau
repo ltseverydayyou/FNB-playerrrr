@@ -194,9 +194,27 @@ if IsOnMobile then
 	})
 end
 
-TabCredits:CreateParagraph({Title='Fixed by ltseverydayyou',Content=''})
-TabCredits:CreateParagraph({Title='Original by Mati278',Content=''})
-TabCredits:CreateParagraph({Title='AC bypass by ltseverydayyou',Content=''})
+if typeof(setclipboard) == 'function' then
+	TabCredits:CreateButton({
+		Name = 'Fixed by ltseverydayyou',
+		Callback = function()
+			setclipboard('https://github.com/ltseverydayyou')
+			Rayfield:Notify({ Title = 'Copied', Content = 'GitHub URL copied to clipboard', Duration = 3 })
+		end,
+	})
+	TabCredits:CreateButton({
+		Name = 'Original by Mati278',
+		Callback = function()
+			setclipboard('https://github.com/Mati278')
+			Rayfield:Notify({ Title = 'Copied', Content = 'GitHub URL copied to clipboard', Duration = 3 })
+		end,
+	})
+else
+	TabCredits:CreateParagraph({ Title = 'Fixed by ltseverydayyou', Content = 'https://github.com/ltseverydayyou' })
+	TabCredits:CreateParagraph({ Title = 'Original by Mati278', Content = 'https://github.com/Mati278' })
+end
+
+TabCredits:CreateParagraph({ Title = 'Anticheat bypass by ltseverydayyou', Content = '' })
 
 TabExtras:CreateToggle({
 	Name='Bloxstrap RPC',
