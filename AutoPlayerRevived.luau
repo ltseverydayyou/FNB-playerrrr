@@ -165,6 +165,19 @@ if not IsOnMobile then
 	})
 end
 
+if not IsOnMobile then
+    TabKeybinds:CreateKeybind({
+        Name='Instant Solo',
+        CurrentKeybind='PageDown',
+        Hold=false,
+        Flag='SoloKey',
+        Callback=function()
+            local ui=Client.PlayerGui:FindFirstChild('SingleplayerUI')
+            if ui then ui.ButtonPressed:FireServer() end
+        end,
+    })
+end
+
 if IsOnMobile then
 	TabMain:CreateToggle({
 		Name='Hide Mobile Buttons',
