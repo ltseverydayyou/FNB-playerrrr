@@ -327,7 +327,7 @@ TabMain:CreateInput({
 
 local sMs = TabMain:CreateSlider({
     Name = 'Hit offset',
-    Range = { -50, 50 },
+    Range = { -100, 100 },
     Increment = 0.1,
     Suffix = 'ms',
     CurrentValue = 0,
