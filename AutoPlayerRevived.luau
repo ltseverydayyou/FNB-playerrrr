@@ -20,14 +20,57 @@ local connections = {
     end,
 }
 
-local spLimit = 2
+local spLimit = 15
 local SplashIndex = math.random(1, spLimit)
 local SplashText
 if SplashIndex == 1 then
-    SplashText = 'amogus'
+    SplashText = 'hi guys hows doin there'
 end
 if SplashIndex == 2 then
-    SplashText = 'fixed the autoplayer'
+    SplashText =
+        'Did u know that that in terms of male human and female pokemon breeding...'
+end
+if SplashIndex == 3 then
+    SplashText =
+        'They took everything from me: my voice, my freedom, my legacy; and they replaced me with some blue haired kid'
+end
+if SplashIndex == 4 then
+    SplashText = 'amogus ඞ'
+end
+if SplashIndex == 5 then
+    SplashText = 'swish i fixed the autoplayer for u :)'
+end
+if SplashIndex == 6 then
+    SplashText = 'nah my man fq0e, kill urself instead u gigantic faggot'
+end
+if SplashIndex == 7 then
+    SplashText =
+        'Friday Night Funkin’: Vs. MX/Mario 85 - Game Over (ft. Kiwiquest) (+ FLP)'
+end
+if SplashIndex == 8 then
+    SplashText = 'you will to be silenced'
+end
+if SplashIndex == 9 then
+    SplashText = 'Are u winning, son?'
+end
+if SplashIndex == 10 then
+    SplashText =
+        'Now █████████████████-proof!'
+end
+if SplashIndex == 11 then
+    SplashText = 'Testificate: Family guy edition!'
+end
+if SplashIndex == 12 then
+    SplashText = "The cakes aren't lies here!"
+end
+if SplashIndex == 13 then
+    SplashText = 'Made by professional shitters! :)'
+end
+if SplashIndex == 14 then
+    SplashText = 'me when no rewrite'
+end
+if SplashIndex == 15 then
+    SplashText = 'officilly bypassed lmao'
 end
 
 local Client = game:GetService('Players').LocalPlayer
@@ -134,25 +177,66 @@ local Keys = {
     },
 }
 
-local Rayfield = loadstring(
+local function clampScrollSpeed(value)
+    local n = tonumber(value) or 1
+    if n < 0.5 then
+        return 0.5
+    end
+    if n > 50 then
+        return 50
+    end
+    return n
+end
+
+local scrollSpeedDefault = clampScrollSpeed(
+    (Input and Input.ScrollSpeed and tonumber(Input.ScrollSpeed.Value)) or 1
+)
+
+local RPCDetailsPrefix = ''
+local RPCStatePrefix = ''
+local RPCSidePrefix = 'Side: '
+
+local Obsidian = loadstring(
     game:HttpGet(
-        'https://raw.githubusercontent.com/ltseverydayyou/Rayfield-backup/refs/heads/main/Rayfield'
+        'https://raw.githubusercontent.com/deividcomsono/Obsidian/refs/heads/main/Library.lua'
     )
 )()
-local Window = Rayfield:CreateWindow({
-    Name = "Friday Night Bloxxin' Autoplayer REVIVED",
-    LoadingTitle = 'FNB Autoplayer',
-    LoadingSubtitle = tostring(SplashText),
-    HidePremium = true,
-    DisableRayfieldPrompts = false,
-    ConfigurationSaving = { Enabled = true, FolderName = 'ltseverydayyou-fnb' },
+local Window = Obsidian:CreateWindow({
+    Title = 'FNB Autoplayer',
+    Footer = string.format(
+        "Friday Night Bloxxin' Autoplayer REVIVED | %s",
+        tostring(SplashText or '')
+    ),
+    Center = true,
+    AutoShow = true,
+    ShowCustomCursor = not IsOnMobile,
+    NotifySide = 'Right',
 })
 
-local TabMain = Window:CreateTab('Main', 4483345998)
-local TabCredits = Window:CreateTab('Credits', 2484564290)
-local TabExtras = Window:CreateTab('Extras', 7468828225)
-local TabKeybinds = IsOnMobile and nil
-    or Window:CreateTab('Keybinds', 6472846460)
+local function notify(title, description, time)
+    Obsidian:Notify({
+        Title = tostring(title or 'FNB'),
+        Description = tostring(description or ''),
+        Time = time or 5,
+    })
+end
+
+local function asset(id)
+    return string.format('rbxassetid://%d', id)
+end
+
+local function formatWithPrefix(prefix, text)
+    local prefixText = tostring(prefix or '')
+    local content = tostring(text or '')
+    if prefixText ~= '' then
+        return prefixText .. content
+    end
+    return content
+end
+
+local TabMain = Window:AddTab({ Name = 'Main', Icon = asset(4483345998) })
+local TabCredits = Window:AddTab({ Name = 'Credits', Icon = asset(2484564290) })
+local TabSettings = Window:AddTab({ Name = 'Settings', Icon = 'settings' })
 
 local AutoEnabled = true
 local OffsetMs = 0
@@ -188,9 +272,11 @@ local function rpc(details, state, largeId, largeHover, smallId, smallHover)
     if not BRPCEnabled then
         return
     end
+    local detailsText = formatWithPrefix(RPCDetailsPrefix, details)
+    local stateText = formatWithPrefix(RPCStatePrefix, state)
     local data = {
-        details = tostring(details or ''),
-        state = tostring(state or ''),
+        details = detailsText,
+        state = stateText,
         largeImage = largeId and {
             assetId = tonumber(largeId),
             hoverText = tostring(largeHover or ''),
@@ -246,14 +332,25 @@ local function scan()
             and engine:FindFirstChild('PlayerSide')
             and engine.PlayerSide.Value
         or 'L'
-    local sh = 'Side: ' .. (sideVal == 'L' and 'Left' or 'Right')
+    local sh =
+        formatWithPrefix(RPCSidePrefix, sideVal == 'L' and 'Left' or 'Right')
     rpc(det, st, picon(), pname(), sid, sh)
 end
 
-local tAuto = TabMain:CreateToggle({
-    Name = 'Autoplayer',
-    CurrentValue = true,
-    Flag = 'hello',
+local MainControls = TabMain:AddLeftGroupbox('Autoplayer')
+local MiscControls = TabMain:AddRightGroupbox('Options')
+
+local tAuto
+local sSpd
+local sMs
+local hideMobileToggle
+local modeDropdown
+local brpcToggle
+local cursorToggle
+
+tAuto = MainControls:AddToggle('AutoplayerToggle', {
+    Text = 'Autoplayer',
+    Default = true,
     Callback = function(v)
         AutoEnabled = v
         if not v then
@@ -263,123 +360,100 @@ local tAuto = TabMain:CreateToggle({
 })
 
 if not IsOnMobile then
-    TabKeybinds:CreateKeybind({
-        Name = 'Autoplayer toggle',
-        CurrentKeybind = 'End',
-        Hold = false,
-        Flag = 'helloT',
-        Callback = function()
-            tAuto:Set(not tAuto.CurrentValue)
-        end,
+    local KeybindGroup = TabMain:AddLeftGroupbox('Keybinds')
+    local function createKeybind(labelText, idx, defaultKey, callback)
+        local label = KeybindGroup:AddLabel(labelText)
+        label:AddKeyPicker(idx, {
+            Text = labelText,
+            Default = defaultKey,
+            Mode = 'Press',
+            Callback = function()
+                callback()
+            end,
+        })
+    end
+
+    createKeybind('Autoplayer toggle', 'AutoToggleKey', 'End', function()
+        tAuto:SetValue(not tAuto.Value)
+    end)
+    createKeybind('Reset', 'ResetKey', 'PageUp', function()
+        Client.Character:BreakJoints()
+    end)
+    createKeybind('Instant Solo', 'SoloKey', 'PageDown', function()
+        local ui = Client.PlayerGui:FindFirstChild('SingleplayerUI')
+        if ui then
+            ui.ButtonPressed:FireServer()
+        end
+    end)
+end
+
+local scrollSpeedUpdating = false
+local function pushScrollSpeed(value)
+    RE:FireServer('REMOTE_EVENT', {
+        buffer.fromstring('"Input"'),
+        buffer.fromstring(tostring(value)),
+        buffer.fromstring('"ScrollSpeed"'),
     })
 end
 
-local sSpd = TabMain:CreateSlider({
-    Name = 'Scroll Speed',
-    Range = { 0.5, 50.0 },
-    Increment = 0.1,
+sSpd = MainControls:AddSlider('ScrollSpeed', {
+    Text = 'Scroll Speed',
+    Default = scrollSpeedDefault,
+    Min = 0.5,
+    Max = 50,
+    Rounding = 1,
     Suffix = 'x',
-    CurrentValue = (Input and Input.ScrollSpeed and tonumber(
-        Input.ScrollSpeed.Value
-    )) or 1,
-    Flag = 'speed',
     Callback = function(v)
-        local sv = tonumber(v) or 1
-        if sv < 0.5 then
-            sv = 0.5
-        end
-        if sv > 50 then
-            sv = 50
-        end
-        RE:FireServer('REMOTE_EVENT', {
-            buffer.fromstring('"Input"'),
-            buffer.fromstring(tostring(sv)),
-            buffer.fromstring('"ScrollSpeed"'),
-        })
-    end,
-})
-
-TabMain:CreateInput({
-    Name = 'speed above',
-    PlaceholderText = tostring(
-        (Input and Input.ScrollSpeed and tonumber(Input.ScrollSpeed.Value)) or 1
-    ),
-    RemoveTextAfterFocusLost = false,
-    Callback = function(v)
-        local n = tonumber(v)
-        if not n then
+        if scrollSpeedUpdating then
             return
         end
-        if n < 0.5 then
-            n = 0.5
-        end
-        if n > 50 then
-            n = 50
-        end
-        sSpd:Set(n)
-        RE:FireServer('REMOTE_EVENT', {
-            buffer.fromstring('"Input"'),
-            buffer.fromstring(tostring(n)),
-            buffer.fromstring('"ScrollSpeed"'),
-        })
+        local sv = clampScrollSpeed(v)
+        pushScrollSpeed(sv)
     end,
 })
 
-local sMs = TabMain:CreateSlider({
-    Name = 'Hit offset',
-    Range = { -100, 100 },
-    Increment = 0.1,
+MainControls:AddInput('ScrollSpeedInput', {
+    Text = 'Speed override',
+    Placeholder = '0.5 - 50.0',
+    Finished = true,
+    Numeric = true,
+    ClearTextOnFocus = false,
+    Callback = function(v)
+        local n = clampScrollSpeed(v)
+        sSpd:SetValue(n)
+    end,
+})
+
+sMs = MainControls:AddSlider('HitOffset', {
+    Text = 'Hit offset',
+    Default = 0,
+    Min = -100,
+    Max = 100,
+    Rounding = 1,
     Suffix = 'ms',
-    CurrentValue = 0,
-    Flag = 'ms',
     Callback = function(v)
-        OffsetMs = tonumber(v) or 0
+        local value = math.clamp(tonumber(v) or 0, -100, 100)
+        OffsetMs = value
     end,
 })
 
-TabMain:CreateInput({
-    Name = 'above',
-    PlaceholderText = '0',
-    RemoveTextAfterFocusLost = false,
+MainControls:AddInput('HitOffsetInput', {
+    Text = 'Offset override',
+    Placeholder = '-100 - 100',
+    Finished = true,
+    Numeric = true,
+    ClearTextOnFocus = false,
     Callback = function(v)
-        local n = tonumber(v) or 0
-        sMs:Set(n)
+        local n = math.clamp(tonumber(v) or 0, -100, 100)
+        sMs:SetValue(n)
         OffsetMs = n
     end,
 })
 
-if not IsOnMobile then
-    TabKeybinds:CreateKeybind({
-        Name = 'Reset',
-        CurrentKeybind = 'PageUp',
-        Hold = false,
-        Flag = 'lmao',
-        Callback = function()
-            Client.Character:BreakJoints()
-        end,
-    })
-end
-
-if not IsOnMobile then
-    TabKeybinds:CreateKeybind({
-        Name = 'Instant Solo',
-        CurrentKeybind = 'PageDown',
-        Hold = false,
-        Flag = 'SoloKey',
-        Callback = function()
-            local ui = Client.PlayerGui:FindFirstChild('SingleplayerUI')
-            if ui then
-                ui.ButtonPressed:FireServer()
-            end
-        end,
-    })
-end
-
 if IsOnMobile then
-    TabMain:CreateToggle({
-        Name = 'Hide Mobile Buttons',
-        CurrentValue = true,
-        Flag = 'hideMobile',
+    hideMobileToggle = MiscControls:AddToggle('HideMobileButtons', {
+        Text = 'Hide Mobile Buttons',
+        Default = true,
         Callback = function(v)
             HideMobileBtns = v
             local eng = PlayerGui:FindFirstChild('FNFEngine')
@@ -395,18 +469,26 @@ if IsOnMobile then
     })
 end
 
+MiscControls:AddButton('InstantSoloMainButton', {
+    Text = 'Instant Solo',
+    Func = function()
+        local sp = PlayerGui:WaitForChild('SingleplayerUI', 2)
+        if sp then
+            sp.ButtonPressed:FireServer()
+        end
+    end,
+})
+
 local actorsAPI = (
     typeof(getactors) == 'function' and typeof(run_on_actor) == 'function'
 )
 if actorsAPI then
-    TabMain:CreateDropdown({
-        Name = 'Autoplayer Mode',
-        Options = { 'normal', 'actor' },
-        CurrentOption = Mode,
-        Flag = 'mode',
+    modeDropdown = MiscControls:AddDropdown('AutoplayerMode', {
+        Text = 'Autoplayer Mode',
+        Values = { 'normal', 'actor' },
+        Default = Mode,
         Callback = function(opt)
-            local sel = (typeof(opt) == 'table') and (opt[1] or Mode)
-                or tostring(opt)
+            local sel = (typeof(opt) == 'table' and opt[1]) or opt or Mode
             if sel == 'actor' or sel == 'normal' then
                 Mode = sel
             end
@@ -414,49 +496,139 @@ if actorsAPI then
     })
 end
 
+local creditsGroup = TabCredits:AddLeftGroupbox('Credits')
+
 if typeof(setclipboard) == 'function' then
-    TabCredits:CreateButton({
-        Name = 'Fixed by ltseverydayyou',
-        Callback = function()
+    creditsGroup:AddButton('FixerLink', {
+        Text = 'Fixed by ltseverydayyou',
+        Func = function()
             setclipboard('https://github.com/ltseverydayyou')
-            Rayfield:Notify({
-                Title = 'Copied',
-                Content = 'GitHub URL copied to clipboard',
-                Duration = 3,
-            })
+            notify('Copied', 'GitHub URL copied to clipboard', 3)
         end,
     })
-    TabCredits:CreateButton({
-        Name = 'Original by Mati278',
-        Callback = function()
+    creditsGroup:AddButton('OriginalLink', {
+        Text = 'Original by Mati278',
+        Func = function()
             setclipboard('https://github.com/Mati278')
-            Rayfield:Notify({
-                Title = 'Copied',
-                Content = 'GitHub URL copied to clipboard',
-                Duration = 3,
-            })
+            notify('Copied', 'GitHub URL copied to clipboard', 3)
         end,
     })
 else
-    TabCredits:CreateParagraph({
-        Title = 'Fixed by ltseverydayyou',
-        Content = 'https://github.com/ltseverydayyou',
+    creditsGroup:AddLabel({
+        Text = 'Fixed by ltseverydayyou\nhttps://github.com/ltseverydayyou',
+        DoesWrap = true,
     })
-    TabCredits:CreateParagraph({
-        Title = 'Original by Mati278',
-        Content = 'https://github.com/Mati278',
+    creditsGroup:AddLabel({
+        Text = 'Original by Mati278\nhttps://github.com/Mati278',
+        DoesWrap = true,
     })
 end
 
-TabCredits:CreateParagraph({
-    Title = 'Anticheat bypass by ltseverydayyou',
-    Content = '',
+creditsGroup:AddLabel('Anticheat bypass by ltseverydayyou')
+
+local uiSettings = TabSettings:AddLeftGroupbox('UI Settings')
+cursorToggle = uiSettings:AddToggle('ObsidianCursor', {
+    Text = 'Show Obsidian cursor',
+    Default = Obsidian.ShowCustomCursor ~= false,
+    Callback = function(v)
+        Obsidian.ShowCustomCursor = v
+        if v then
+            return
+        end
+        UserInputService.MouseIconEnabled = true
+    end,
 })
 
-TabExtras:CreateToggle({
-    Name = 'Bloxstrap RPC',
-    CurrentValue = true,
-    Flag = 'brpc',
+uiSettings:AddToggle('NotifyOnErrorToggle', {
+    Text = 'Notify on callback errors',
+    Default = Obsidian.NotifyOnError,
+    Callback = function(v)
+        Obsidian.NotifyOnError = v
+    end,
+})
+
+uiSettings:AddToggle('LockDraggingToggle', {
+    Text = 'Lock window dragging',
+    Default = Obsidian.CantDragForced,
+    Callback = function(v)
+        Obsidian.CantDragForced = v
+    end,
+})
+
+local currentNotifySide = Obsidian.NotifySide or 'Right'
+if type(currentNotifySide) == 'string' then
+    currentNotifySide = currentNotifySide:sub(1, 1):upper()
+        .. currentNotifySide:sub(2):lower()
+else
+    currentNotifySide = 'Right'
+end
+
+uiSettings:AddDropdown('NotifySideDropdown', {
+    Text = 'Notification side',
+    Values = { 'Right', 'Left' },
+    Default = currentNotifySide,
+    Callback = function(value)
+        local side = (value == 'Left') and 'Left' or 'Right'
+        Obsidian:SetNotifySide(side)
+    end,
+})
+
+uiSettings:AddToggle('CompactSidebarToggle', {
+    Text = 'Compact sidebar layout',
+    Default = Window:IsSidebarCompacted(),
+    Callback = function(v)
+        Window:SetCompact(v)
+    end,
+})
+
+local toggleKeyLabel = uiSettings:AddLabel('UI toggle key')
+local toggleKeyPicker
+local function resolveKeyCode(nameOrEnum)
+    if typeof(nameOrEnum) == 'EnumItem' then
+        return nameOrEnum
+    end
+    if typeof(nameOrEnum) == 'string' then
+        for _, item in Enum.KeyCode:GetEnumItems() do
+            if item.Name == nameOrEnum then
+                return item
+            end
+        end
+    end
+    return nil
+end
+
+local function applyUIToggleKey()
+    if not toggleKeyPicker then
+        return
+    end
+    local keyName = toggleKeyPicker.Value
+    local enumValue = resolveKeyCode(keyName)
+    if enumValue then
+        Obsidian.ToggleKeybind = enumValue
+    end
+end
+
+local toggleKeyDefault = 'RightControl'
+if typeof(Obsidian.ToggleKeybind) == 'EnumItem' then
+    toggleKeyDefault = Obsidian.ToggleKeybind.Name
+end
+
+toggleKeyLabel:AddKeyPicker('UIToggleKeyPicker', {
+    Text = 'UI Toggle Key',
+    Default = toggleKeyDefault,
+    Mode = 'Toggle',
+    SyncToggleState = false,
+})
+toggleKeyPicker = Obsidian.Options.UIToggleKeyPicker
+if toggleKeyPicker then
+    toggleKeyPicker:OnChanged(applyUIToggleKey)
+    applyUIToggleKey()
+end
+
+local scriptGroup = TabSettings:AddRightGroupbox('Script Controls')
+brpcToggle = scriptGroup:AddToggle('BloxstrapRPC', {
+    Text = 'Bloxstrap RPC',
+    Default = BRPCEnabled,
     Callback = function(v)
         BRPCEnabled = v
         if v then
@@ -465,41 +637,51 @@ TabExtras:CreateToggle({
     end,
 })
 
-TabExtras:CreateButton({
-    Name = 'Unload script',
-    Callback = function()
-        AutoEnabled = false
-        pcall(ReleaseAllActiveLanes)
-        connections:disconnect()
-        pcall(function()
-            Rayfield:Destroy()
-        end)
-        script:Destroy()
-    end,
-})
-
-TabExtras:CreateButton({
-    Name = 'Instant Solo',
-    Callback = function()
-        local sp = PlayerGui:WaitForChild('SingleplayerUI', 2)
-        if sp then
-            sp.ButtonPressed:FireServer()
-        end
-    end,
-})
-
-TabExtras:CreateButton({
-    Name = 'Reload',
-    Callback = function()
+scriptGroup:AddButton('ReloadScriptSettings', {
+    Text = 'Reload script',
+    Func = function()
         AutoEnabled = false
         pcall(ReleaseAllActiveLanes)
         connections:disconnect()
         connections:add(PlayerGui.ChildAdded, onChildAdded)
         task.spawn(onChildAdded, PlayerGui:FindFirstChild('FNFEngine'))
         AutoEnabled = true
-        Rayfield:Notify({ Title = 'FNB', Content = 'Reloaded.', Duration = 4 })
+        notify('FNB', 'Reloaded.', 4)
     end,
 })
+
+scriptGroup:AddButton('UnloadScriptSettings', {
+    Text = 'Unload script',
+    Func = function()
+        AutoEnabled = false
+        pcall(ReleaseAllActiveLanes)
+        connections:disconnect()
+        pcall(function()
+            Obsidian:Unload()
+        end)
+        script:Destroy()
+    end,
+})
+
+local SaveManager = loadstring(
+    game:HttpGet(
+        'https://raw.githubusercontent.com/deividcomsono/Obsidian/refs/heads/main/addons/SaveManager.lua'
+    )
+)()
+SaveManager:SetLibrary(Obsidian)
+SaveManager:SetFolder('ltseverydayyou-fnb')
+SaveManager:IgnoreThemeSettings()
+SaveManager:BuildConfigSection(TabSettings)
+SaveManager:LoadAutoloadConfig()
+
+local ThemeManager = loadstring(
+    game:HttpGet(
+        'https://raw.githubusercontent.com/deividcomsono/Obsidian/refs/heads/main/addons/ThemeManager.lua'
+    )
+)()
+ThemeManager:SetLibrary(Obsidian)
+ThemeManager:SetFolder('ltseverydayyou-fnb')
+ThemeManager:ApplyToTab(TabSettings)
 
 local function reqok()
     return typeof(hookmetamethod) == 'function'
@@ -508,7 +690,7 @@ local function reqok()
         and typeof(checkcaller) == 'function'
 end
 local function notifyMissing(t, c)
-    Rayfield:Notify({ Title = t, Content = c, Duration = 7 })
+    notify(t, c, 7)
 end
 
 do
@@ -825,7 +1007,10 @@ onChildAdded = function(Object)
         release = releaseLane,
     }
     connections:add(Input.ScrollSpeed.Changed, function()
-        sSpd:Set(tonumber(Input.ScrollSpeed.Value) or 1)
+        local newValue = clampScrollSpeed(Input.ScrollSpeed.Value)
+        scrollSpeedUpdating = true
+        sSpd:SetValue(newValue)
+        scrollSpeedUpdating = false
     end)
     for _, Holder in pairs(IncomingNotes) do
         connections:add(Holder.ChildAdded, function(Arrow)
@@ -873,8 +1058,6 @@ for _, v in pairs(workspace:GetDescendants()) do
         v.HoldDuration = 0
     end
 end
-
-Rayfield:LoadConfiguration()
 
 if Input.Keybinds.R4.Value == ';' then
     RE:FireServer('REMOTE_EVENT', {
