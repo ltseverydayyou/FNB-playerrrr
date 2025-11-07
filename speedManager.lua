@@ -1,4 +1,4 @@
-return {
+local t = {
   ["10.0"]= -291.7;
   ["9.9"] = -290.5;
   ["9.8"] = -288.5;
@@ -9,7 +9,7 @@ return {
   ["9.3"] = -278;
   ["9.2"] = -277;
   ["9.1"] = -276;
-  ["9.0"] = -273.2; --:
+  ["9.0"] = -273.2;
   ["8.9"] = -271;
   ["8.8"] = -269;
   ["8.7"] = -267;
@@ -57,7 +57,7 @@ return {
   ["4.5"] = -183;
   ["4.4"] = -181;
   ["4.3"] = -179;
-  ["4.2"] = -153; --:
+  ["4.2"] = -153;
   ["4.1"] = -151;
   ["4.0"] = -146;
   ["3.9"] = -140;
@@ -96,3 +96,20 @@ return {
   ["0.6"] = 299;
   ["0.5"] = 334;
 }
+
+return setmetatable(t, {
+  __index = function(self, k)
+    local s = tonumber(k)
+    if not s then return nil end
+    if s < 0.5 or s > 50.0 then return nil end
+    local snap = math.floor(s*10+0.5)/10
+    local key = string.format('%.1f', snap)
+    local v = rawget(self, key)
+    if v ~= nil then return v end
+    if snap <= 10.0 then return nil end
+    local base = self["10.0"] or -291.7
+    local ms = base - (snap - 10.0) * 12
+    rawset(self, key, ms)
+    return ms
+  end
+})
