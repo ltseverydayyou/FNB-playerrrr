@@ -982,55 +982,33 @@ local function playNoteSequence(Holder, Arrow, keyCode, AutoCtx)
     task.spawn(function()
         local baseOffset = AutoCtx.baseOffset
         task.wait(baseOffset + (AutoCtx.offsetMs / 1000))
-        if not AutoCtx.enabled then
-            return
-        end
-        if not Arrow or not Arrow.Parent or not Arrow.Visible then
-            return
-        end
+        if not AutoCtx.enabled then return end
+        if not Arrow or not Arrow.Parent or not Arrow.Visible then return end
+
         local function isHold(a)
             local f = a:FindFirstChild('Frame')
             local b = f and f:FindFirstChild('Bar')
-            return (b and b.Size and b.Size.Y and (b.Size.Y.Scale > 0.02))
-                or false
+            return (b and b.Size and b.Size.Y and (b.Size.Y.Scale > 0.0)) or false
         end
-        local currentlyHold = isHold(Arrow)
-        if not currentlyHold and AutoCtx.laneDown[Holder] then
-            local rehold = (AutoCtx.laneCount[Holder] or 0) > 0
+
+        if AutoCtx.laneDown[Holder] then
             AutoCtx.release(Holder.Name, keyCode)
             game:GetService('RunService').Heartbeat:Wait()
             AutoCtx.press(Holder.Name, keyCode)
             game:GetService('RunService').Heartbeat:Wait()
-            if rehold then
-                AutoCtx.laneDown[Holder] = true
-            else
-                AutoCtx.release(Holder.Name, keyCode)
-                AutoCtx.laneDown[Holder] = false
-            end
-            return
-        end
-        AutoCtx.laneCount[Holder] = (AutoCtx.laneCount[Holder] or 0) + 1
-        if not AutoCtx.laneDown[Holder] then
+            AutoCtx.laneDown[Holder] = true
+        else
             AutoCtx.press(Holder.Name, keyCode)
             AutoCtx.laneDown[Holder] = true
         end
-        while Arrow and Arrow.Parent and Arrow.Visible do
-            local f = Arrow:FindFirstChild('Frame')
-            local b = f and f:FindFirstChild('Bar')
-            local holding = (
-                b
-                and b.Size
-                and b.Size.Y
-                and (b.Size.Y.Scale > 0.0)
-            ) or false
-            if not holding then
-                break
-            end
-            if not AutoCtx.enabled then
-                break
-            end
+
+        AutoCtx.laneCount[Holder] = (AutoCtx.laneCount[Holder] or 0) + 1
+
+        while Arrow and Arrow.Parent and Arrow.Visible and AutoCtx.enabled do
+            if not isHold(Arrow) then break end
             task.wait()
         end
+
         AutoCtx.laneCount[Holder] = AutoCtx.laneCount[Holder] - 1
         if AutoCtx.laneCount[Holder] <= 0 then
             AutoCtx.laneCount[Holder] = 0
