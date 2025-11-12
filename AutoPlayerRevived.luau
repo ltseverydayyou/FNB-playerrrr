@@ -875,12 +875,13 @@ do
 end
 
 do
-    if reqok then
+    if reqok() then
         local oldhmmi
         local oldhmmnc
         oldhmmi = hookmetamethod(game, '__index', function(self, m)
             if
-                self == Client
+                not checkcaller()
+                and self == Client
                 and typeof(m) == 'string'
                 and m:lower() == 'kick'
             then
@@ -896,7 +897,7 @@ do
             '__namecall',
             newcclosure(function(self, ...)
                 local l = (getnamecallmethod() or ''):lower()
-                if self == Client and l == 'kick' then
+                if not checkcaller() and self == Client and l == 'kick' then
                     return
                 end
                 if not checkcaller() and l == 'findservice' then
@@ -908,9 +909,38 @@ do
                         return
                     end
                 end
+                if
+                    not checkcaller()
+                    and (l == 'fireserver' or l == 'invokeserver')
+                then
+                    if
+                        typeof(self) == 'Instance'
+                        and tostring(self.Name):lower() == 'userinputasync'
+                    then
+                        return
+                    end
+                end
                 return oldhmmnc(self, ...)
             end)
         )
+        local real_require = require
+        local patched = setmetatable({}, { __mode = 'k' })
+        require = function(mod)
+            local ok, obj = pcall(real_require, mod)
+            if not ok then
+                error(obj, 2)
+            end
+            if type(obj) == 'table' and not patched[obj] then
+                if tostring(rawget(obj, 'Type') or '') == 'OnMiss' then
+                    obj.Type = 'OnHit'
+                    if type(obj.Run) == 'function' then
+                        obj.Run = function() end
+                    end
+                end
+                patched[obj] = true
+            end
+            return obj
+        end
     end
 end
 
@@ -982,13 +1012,18 @@ local function playNoteSequence(Holder, Arrow, keyCode, AutoCtx)
     task.spawn(function()
         local baseOffset = AutoCtx.baseOffset
         task.wait(baseOffset + (AutoCtx.offsetMs / 1000))
-        if not AutoCtx.enabled then return end
-        if not Arrow or not Arrow.Parent or not Arrow.Visible then return end
+        if not AutoCtx.enabled then
+            return
+        end
+        if not Arrow or not Arrow.Parent or not Arrow.Visible then
+            return
+        end
 
         local function isHold(a)
             local f = a:FindFirstChild('Frame')
             local b = f and f:FindFirstChild('Bar')
-            return (b and b.Size and b.Size.Y and (b.Size.Y.Scale > 0.0)) or false
+            return (b and b.Size and b.Size.Y and (b.Size.Y.Scale > 0.0))
+                or false
         end
 
         if AutoCtx.laneDown[Holder] then
@@ -1005,7 +1040,9 @@ local function playNoteSequence(Holder, Arrow, keyCode, AutoCtx)
         AutoCtx.laneCount[Holder] = (AutoCtx.laneCount[Holder] or 0) + 1
 
         while Arrow and Arrow.Parent and Arrow.Visible and AutoCtx.enabled do
-            if not isHold(Arrow) then break end
+            if not isHold(Arrow) then
+                break
+            end
             task.wait()
         end
 
