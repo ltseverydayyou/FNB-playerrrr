@@ -193,6 +193,7 @@ end
 local scrollSpeedDefault = clampScrollSpeed(
     (Input and Input.ScrollSpeed and tonumber(Input.ScrollSpeed.Value)) or 1
 )
+local currentScrollSpeed = scrollSpeedDefault
 
 local RPCDetailsPrefix = ''
 local RPCStatePrefix = ''
@@ -244,6 +245,7 @@ local AutoEnabled = true
 local OffsetMs = 0
 local ReleaseAllActiveLanes = function() end
 local onChildAdded
+local regGuiListeners
 local HideMobileBtns = true
 local BRPCEnabled = true
 local Mode = 'normal'
@@ -252,6 +254,61 @@ local LullabyChanged = LullabyChanged or false
 local OriginalSpaceBind = OriginalSpaceBind or nil
 local LullabyConnBG, LullabyConnPend, LullabyBeatArmed, LullabyConnKey =
     nil, nil, false, nil
+local LullabySpamToken = 0
+local LullabySpamInterval = 0
+local LullabyRebinding = false
+local function resolveKeyName(value)
+    if value == nil then
+        return 'Space'
+    end
+    if typeof(value) == 'EnumItem' then
+        return value.Name
+    end
+    if typeof(value) == 'string' then
+        return value
+    end
+    return tostring(value)
+end
+
+local AutoModFlags = {
+    Hard = {
+        Death = false,
+        FadeIn = false,
+        FadeOut = false,
+        Pendulum = false,
+        Perfect = false,
+        SuddenDeath = false,
+    },
+    Normal = {
+        GhostTapping = false,
+        Mirror = false,
+        Random = false,
+    },
+}
+
+local ModifierList = {
+    Hard = { 'Death', 'FadeIn', 'FadeOut', 'Pendulum', 'Perfect', 'SuddenDeath' },
+    Normal = { 'GhostTapping', 'Mirror', 'Random' },
+}
+
+local AppliedModifierState = {}
+local ModApplyDelay = 0.5
+local applyModsToken = 0
+local modToggleTokens = {}
+
+local function initModState()
+    for kind, names in pairs(ModifierList) do
+        AppliedModifierState[kind] = AppliedModifierState[kind] or {}
+        local bucket = AppliedModifierState[kind]
+        for _, name in ipairs(names) do
+            if bucket[name] == nil then
+                bucket[name] = false
+            end
+        end
+    end
+end
+
+initModState()
 
 local function pname()
     local ok, info = pcall(
@@ -323,6 +380,203 @@ local function LullabyTap()
     end
 end
 
+local function guiClick(btn)
+    if btn and not btn:IsA('GuiButton') then
+        btn = asClickable(btn)
+    end
+    if not btn then
+        return
+    end
+    if typeof(firesignal) == 'function' then
+        pcall(firesignal, btn.MouseButton1Down)
+        task.wait()
+        pcall(firesignal, btn.MouseButton1Click)
+        pcall(firesignal, btn.Activated)
+        task.wait()
+        pcall(firesignal, btn.MouseButton1Up)
+    else
+        if btn:IsA('GuiButton') and typeof(btn.Activate) == 'function' then
+            pcall(function()
+                btn:Activate()
+            end)
+        end
+    end
+end
+
+local function normModKey(str)
+    if type(str) ~= 'string' then
+        return ''
+    end
+    return (str:gsub('%s+', '')):lower()
+end
+
+local function getSpaceBind()
+    if not Keybinds then
+        return nil
+    end
+    return Keybinds:FindFirstChild('Space')
+end
+
+local function setSpaceBind(value)
+    local spaceValue = getSpaceBind()
+    if not spaceValue then
+        return
+    end
+    if resolveKeyName(spaceValue.Value) == value then
+        return
+    end
+    LullabyRebinding = true
+    RE:FireServer('REMOTE_EVENT', {
+        buffer.fromstring('"Input"'),
+        buffer.fromstring(string.format('"%s"', tostring(value))),
+        buffer.fromstring('"Space"'),
+    })
+    LullabyRebinding = false
+end
+
+local function asClickable(node)
+    if not node then
+        return nil
+    end
+    if node:IsA('GuiButton') then
+        return node
+    end
+    for _, child in ipairs(node:GetDescendants()) do
+        if child:IsA('GuiButton') then
+            return child
+        end
+    end
+    return nil
+end
+
+local function findModButton(container, kind, name)
+    if not container then
+        return nil
+    end
+    local targetKey = normModKey(name)
+    local buckets = {
+        container:FindFirstChild(kind),
+        container:FindFirstChild(kind .. 'Modifiers'),
+        container,
+    }
+    for _, bucket in ipairs(buckets) do
+        if bucket then
+            local direct = bucket:FindFirstChild(name)
+            local clickable = asClickable(direct)
+            if clickable then
+                return clickable
+            end
+            for _, child in ipairs(bucket:GetDescendants()) do
+                if normModKey(child.Name) == targetKey then
+                    local btn = asClickable(child)
+                    if btn then
+                        return btn
+                    end
+                elseif child:IsA('GuiButton') then
+                    local txt = tostring(child.Text or '')
+                    if normModKey(txt) == targetKey then
+                        return child
+                    end
+                end
+            end
+        end
+    end
+    return nil
+end
+
+local function getModButton(kind, name)
+    local engineGui = PlayerGui:FindFirstChild('FNFEngine')
+    local engine = engineGui and engineGui:FindFirstChild('Engine')
+    local button = findModButton(
+        engine and engine:FindFirstChild('Modifiers'),
+        kind,
+        name
+    )
+    if button then
+        return button
+    end
+    local gui = PlayerGui:FindFirstChild('GameUI')
+    local ss = gui and gui:FindFirstChild('SongSelect')
+    local mods = ss and ss:FindFirstChild('Modifiers')
+    local act = mods and mods:FindFirstChild('ActualModifiers')
+    return findModButton(act, kind, name)
+end
+
+local function engineReady()
+    return PlayerGui:FindFirstChild('FNFEngine') ~= nil
+end
+
+local function applyMod(kind, name, shouldEnable, force)
+    local stateBucket = AppliedModifierState[kind]
+    if not stateBucket then
+        stateBucket = {}
+        AppliedModifierState[kind] = stateBucket
+    end
+    if stateBucket[name] == nil then
+        stateBucket[name] = false
+    end
+    local desired = shouldEnable and true or false
+    local previous = stateBucket[name]
+    local needsToggle
+    if desired then
+        needsToggle = force or (previous ~= true)
+    else
+        needsToggle = previous == true
+    end
+    if not needsToggle then
+        return
+    end
+    if not engineReady() then
+        return
+    end
+    local btn = getModButton(kind, name)
+    if not btn then
+        return
+    end
+    guiClick(btn)
+    stateBucket[name] = desired
+end
+
+local function queueModApply(kind, name, shouldEnable)
+    local key = string.format('%s:%s', tostring(kind), tostring(name))
+    modToggleTokens[key] = (modToggleTokens[key] or 0) + 1
+    local token = modToggleTokens[key]
+    task.delay(ModApplyDelay, function()
+        if modToggleTokens[key] ~= token then
+            return
+        end
+        modToggleTokens[key] = nil
+        applyMod(kind, name, shouldEnable, false)
+    end)
+end
+
+local function applyMods(force)
+    applyModsToken += 1
+    local token = applyModsToken
+    task.spawn(function()
+        task.wait(ModApplyDelay)
+        if token ~= applyModsToken then
+            return
+        end
+        if not engineReady() then
+            return
+        end
+        for kind, names in pairs(ModifierList) do
+            local flags = AutoModFlags[kind]
+            local stateBucket = AppliedModifierState[kind]
+            for _, name in ipairs(names) do
+                local desired = false
+                if flags then
+                    desired = flags[name] and true or false
+                end
+                if desired or (stateBucket and stateBucket[name]) then
+                    applyMod(kind, name, desired, force)
+                end
+            end
+        end
+    end)
+end
+
 local function scan()
     local eng = PlayerGui:FindFirstChild('FNFEngine')
     if not eng then
@@ -361,27 +615,63 @@ local function hookPend(pend)
         LullabyConnPend = nil
     end
     LullabyBeatArmed = false
+    LullabySpamToken += 1
+    local function stopSpam()
+        if LullabyBeatArmed then
+            LullabyBeatArmed = false
+            LullabySpamToken += 1
+        end
+    end
+    local function startSpam()
+        if LullabyBeatArmed then
+            return
+        end
+        LullabyBeatArmed = true
+        LullabySpamToken += 1
+        local token = LullabySpamToken
+        task.spawn(function()
+            while AutoLullaby
+                and LullabyBeatArmed
+                and token == LullabySpamToken
+            do
+                local rotation = tonumber(pend.Rotation) or 0
+                if rotation < -7 or rotation > 7 then
+                    break
+                end
+                LullabyTap()
+                if LullabySpamInterval and LullabySpamInterval > 0 then
+                    task.wait(LullabySpamInterval)
+                else
+                    task.wait()
+                end
+            end
+            if token == LullabySpamToken then
+                LullabyBeatArmed = false
+            end
+        end)
+    end
+    local function evaluate()
+        local r = tonumber(pend.Rotation) or 0
+        if r >= -10 and r <= 10 then
+            startSpam()
+        else
+            stopSpam()
+        end
+    end
     LullabyConnPend = pend:GetPropertyChangedSignal('Rotation')
         :Connect(function()
             if not AutoLullaby then
                 return
             end
-            local r = tonumber(pend.Rotation) or 0
-            local inWin = (r >= -10 and r <= 10)
-            if inWin and not LullabyBeatArmed then
-                LullabyBeatArmed = true
-                LullabyTap()
-            elseif not inWin and LullabyBeatArmed then
-                LullabyBeatArmed = false
-            end
+            evaluate()
         end)
+    evaluate()
 end
 
-local function ApplyLullabyKeybind(eng)
+local function setupLullaby(eng)
     if not AutoLullaby or IsOnMobile then
         return
     end
-
     if LullabyConnKey then
         LullabyConnKey:Disconnect()
         LullabyConnKey = nil
@@ -395,37 +685,35 @@ local function ApplyLullabyKeybind(eng)
         LullabyConnPend = nil
     end
     LullabyBeatArmed = false
-
-    local current = tostring(Keybinds.Space.Value)
+    LullabySpamToken += 1
+    local spaceBind = getSpaceBind()
+    local current = resolveKeyName(spaceBind and spaceBind.Value or 'Space')
     if not OriginalSpaceBind then
         OriginalSpaceBind = current
     end
-    if current == 'Space' then
+    local function forceButtonABind()
+        local bindObj = getSpaceBind()
+        local now = resolveKeyName(bindObj and bindObj.Value or 'Space')
+        if now == 'ButtonA' then
+            return
+        end
         RE:FireServer('REMOTE_EVENT', {
             buffer.fromstring('"Input"'),
             buffer.fromstring('"ButtonA"'),
             buffer.fromstring('"Space"'),
         })
         LullabyChanged = true
+        setSpaceBind('ButtonA')
     end
-
-    LullabyConnKey = Keybinds.Space
-        :GetPropertyChangedSignal('Value')
-        :Connect(function()
-            if not AutoLullaby then
-                return
-            end
-            local now = tostring(Keybinds.Space.Value)
-            if now == 'Space' then
-                RE:FireServer('REMOTE_EVENT', {
-                    buffer.fromstring('"Input"'),
-                    buffer.fromstring('"ButtonA"'),
-                    buffer.fromstring('"Space"'),
-                })
-                LullabyChanged = true
-            end
-        end)
-
+    forceButtonABind()
+    LullabyConnKey = spaceBind
+        and spaceBind:GetPropertyChangedSignal('Value')
+            :Connect(function()
+                if not AutoLullaby or LullabyRebinding then
+                    return
+                end
+                forceButtonABind()
+            end)
     local engine = eng:FindFirstChild('Engine')
     if not engine then
         return
@@ -454,7 +742,7 @@ local function ApplyLullabyKeybind(eng)
     end)
 end
 
-local function RestoreLullabyKeybind()
+local function resetLullaby()
     if LullabyConnKey then
         LullabyConnKey:Disconnect()
         LullabyConnKey = nil
@@ -468,12 +756,17 @@ local function RestoreLullabyKeybind()
         LullabyConnPend = nil
     end
     LullabyBeatArmed = false
-    if LullabyChanged and OriginalSpaceBind == 'Space' then
+    if LullabyChanged then
         RE:FireServer('REMOTE_EVENT', {
             buffer.fromstring('"Input"'),
             buffer.fromstring('"Space"'),
             buffer.fromstring('"Space"'),
         })
+    end
+    if OriginalSpaceBind then
+        setSpaceBind(OriginalSpaceBind)
+    else
+        setSpaceBind('Space')
     end
     LullabyChanged = false
     OriginalSpaceBind = nil
@@ -481,6 +774,8 @@ end
 
 local MainControls = TabMain:AddLeftGroupbox('Autoplayer')
 local MiscControls = TabMain:AddRightGroupbox('Options')
+local AutoModsHard = TabMain:AddRightGroupbox('Auto Modifiers (Hard)')
+local AutoModsNormal = TabMain:AddRightGroupbox('Auto Modifiers (Normal)')
 
 local tAuto
 local sSpd
@@ -514,7 +809,6 @@ if not IsOnMobile then
             end,
         })
     end
-
     createKeybind('Autoplayer toggle', 'AutoToggleKey', 'End', function()
         tAuto:SetValue(not tAuto.Value)
     end)
@@ -530,12 +824,106 @@ if not IsOnMobile then
 end
 
 local scrollSpeedUpdating = false
+local scrollSpeedButtonConn
+local scrollSpeedButtonAncestryConn
+
 local function pushScrollSpeed(value)
     RE:FireServer('REMOTE_EVENT', {
         buffer.fromstring('"Input"'),
         buffer.fromstring(tostring(value)),
         buffer.fromstring('"ScrollSpeed"'),
     })
+end
+
+local function setSliderValueFromExternal(value)
+    local clamped = clampScrollSpeed(value)
+    currentScrollSpeed = clamped
+    if not sSpd then
+        return
+    end
+    scrollSpeedUpdating = true
+    sSpd:SetValue(clamped)
+    scrollSpeedUpdating = false
+end
+
+local function parseScrollSpeedText(text)
+    if type(text) ~= 'string' then
+        return nil
+    end
+    local match = string.match(text, '[-+]?%d+%.?%d*')
+    if not match then
+        return nil
+    end
+    return tonumber(match)
+end
+
+local function syncSliderWithScrollSpeedButton(button)
+    if not button or scrollSpeedUpdating then
+        return
+    end
+    local parsed = parseScrollSpeedText(button.Text)
+    if not parsed then
+        return
+    end
+    local clamped = clampScrollSpeed(parsed)
+    if math.abs(clamped - currentScrollSpeed) < 0.001 then
+        return
+    end
+    setSliderValueFromExternal(clamped)
+end
+
+local function detachScrollWatcher()
+    if scrollSpeedButtonConn then
+        scrollSpeedButtonConn:Disconnect()
+        scrollSpeedButtonConn = nil
+    end
+    if scrollSpeedButtonAncestryConn then
+        scrollSpeedButtonAncestryConn:Disconnect()
+        scrollSpeedButtonAncestryConn = nil
+    end
+end
+
+local function attachScrollWatcher()
+    detachScrollWatcher()
+    task.spawn(function()
+        local gui = PlayerGui:FindFirstChild('GameUI')
+            or PlayerGui:WaitForChild('GameUI', 5)
+        if not gui then
+            return
+        end
+        local settings = gui:FindFirstChild('Settings')
+            or gui:WaitForChild('Settings', 5)
+        if not settings then
+            return
+        end
+        local options = settings:FindFirstChild('Options')
+            or settings:WaitForChild('Options', 5)
+        if not options then
+            return
+        end
+        local scrollNode = options:FindFirstChild('ScrollSpeed')
+            or options:WaitForChild('ScrollSpeed', 5)
+        if not scrollNode then
+            return
+        end
+        local button = scrollNode:FindFirstChild('Button')
+            or scrollNode:WaitForChild('Button', 5)
+        if not button or not button:IsA('TextButton') then
+            return
+        end
+        local function onTextChanged()
+            syncSliderWithScrollSpeedButton(button)
+        end
+        scrollSpeedButtonConn =
+            button:GetPropertyChangedSignal('Text'):Connect(onTextChanged)
+        scrollSpeedButtonAncestryConn =
+            button.AncestryChanged:Connect(function(_, parent)
+                if not parent then
+        attachScrollWatcher()
+                end
+            end)
+        onTextChanged()
+    end)
 end
 
 sSpd = MainControls:AddSlider('ScrollSpeed', {
@@ -550,6 +938,7 @@ sSpd = MainControls:AddSlider('ScrollSpeed', {
             return
         end
         local sv = clampScrollSpeed(v)
+        currentScrollSpeed = sv
         pushScrollSpeed(sv)
     end,
 })
@@ -613,23 +1002,23 @@ end
 
 if not IsOnMobile then
     MiscControls:AddToggle('AutoLullaby', {
-        Text = 'Auto Lullaby [WIP]',
+        Text = 'Auto Lullaby',
         Default = false,
         Callback = function(v)
             AutoLullaby = v and true or false
             local eng = PlayerGui:FindFirstChild('FNFEngine')
             if eng then
                 if AutoLullaby then
-                    ApplyLullabyKeybind(eng)
+                    setupLullaby(eng)
                 else
-                    RestoreLullabyKeybind()
+                    resetLullaby()
                 end
             end
         end,
     })
 end
 
-MiscControls:AddButton('InstantSoloMainButton', {
+MiscControls:AddButton('Instant Solo', {
     Text = 'Instant Solo',
     Func = function()
         local sp = PlayerGui:WaitForChild('SingleplayerUI', 2)
@@ -655,6 +1044,80 @@ if actorsAPI then
         end,
     })
 end
+
+AutoModsHard:AddToggle('AM_Hard_Death', {
+    Text = 'Death',
+    Default = false,
+    Callback = function(v)
+        AutoModFlags.Hard.Death = v
+        queueModApply('Hard', 'Death', v)
+    end,
+})
+AutoModsHard:AddToggle('AM_Hard_FadeIn', {
+    Text = 'FadeIn',
+    Default = false,
+    Callback = function(v)
+        AutoModFlags.Hard.FadeIn = v
+        queueModApply('Hard', 'FadeIn', v)
+    end,
+})
+AutoModsHard:AddToggle('AM_Hard_FadeOut', {
+    Text = 'FadeOut',
+    Default = false,
+    Callback = function(v)
+        AutoModFlags.Hard.FadeOut = v
+        queueModApply('Hard', 'FadeOut', v)
+    end,
+})
+AutoModsHard:AddToggle('AM_Hard_Pendulum', {
+    Text = 'Pendulum',
+    Default = false,
+    Callback = function(v)
+        AutoModFlags.Hard.Pendulum = v
+        queueModApply('Hard', 'Pendulum', v)
+    end,
+})
+AutoModsHard:AddToggle('AM_Hard_Perfect', {
+    Text = 'Perfect',
+    Default = false,
+    Callback = function(v)
+        AutoModFlags.Hard.Perfect = v
+        queueModApply('Hard', 'Perfect', v)
+    end,
+})
+AutoModsHard:AddToggle('AM_Hard_SuddenDeath', {
+    Text = 'SuddenDeath',
+    Default = false,
+    Callback = function(v)
+        AutoModFlags.Hard.SuddenDeath = v
+        queueModApply('Hard', 'SuddenDeath', v)
+    end,
+})
+
+AutoModsNormal:AddToggle('AM_Normal_GhostTapping', {
+    Text = 'GhostTapping',
+    Default = false,
+    Callback = function(v)
+        AutoModFlags.Normal.GhostTapping = v
+        queueModApply('Normal', 'GhostTapping', v)
+    end,
+})
+AutoModsNormal:AddToggle('AM_Normal_Mirror', {
+    Text = 'Mirror',
+    Default = false,
+    Callback = function(v)
+        AutoModFlags.Normal.Mirror = v
+        queueModApply('Normal', 'Mirror', v)
+    end,
+})
+AutoModsNormal:AddToggle('AM_Normal_Random', {
+    Text = 'Random',
+    Default = false,
+    Callback = function(v)
+        AutoModFlags.Normal.Random = v
+        queueModApply('Normal', 'Random', v)
+    end,
+})
 
 local creditsGroup = TabCredits:AddLeftGroupbox('Credits')
 
@@ -797,20 +1260,22 @@ brpcToggle = scriptGroup:AddToggle('BloxstrapRPC', {
     end,
 })
 
-scriptGroup:AddButton('ReloadScriptSettings', {
+scriptGroup:AddButton('Reload script', {
     Text = 'Reload script',
     Func = function()
         AutoEnabled = false
         pcall(ReleaseAllActiveLanes)
+        detachScrollWatcher()
+        resetLullaby()
         connections:disconnect()
-        connections:add(PlayerGui.ChildAdded, onChildAdded)
-        task.spawn(onChildAdded, PlayerGui:FindFirstChild('FNFEngine'))
+        regGuiListeners()
+        scan()
         AutoEnabled = true
         notify('FNB', 'Reloaded.', 4)
     end,
 })
 
-scriptGroup:AddButton('UnloadScriptSettings', {
+scriptGroup:AddButton('Unload script', {
     Text = 'Unload script',
     Func = function()
         AutoEnabled = false
@@ -819,7 +1284,6 @@ scriptGroup:AddButton('UnloadScriptSettings', {
         pcall(function()
             Obsidian:Unload()
         end)
-        script:Destroy()
     end,
 })
 
@@ -1018,14 +1482,12 @@ local function playNoteSequence(Holder, Arrow, keyCode, AutoCtx)
         if not Arrow or not Arrow.Parent or not Arrow.Visible then
             return
         end
-
         local function isHold(a)
             local f = a:FindFirstChild('Frame')
             local b = f and f:FindFirstChild('Bar')
             return (b and b.Size and b.Size.Y and (b.Size.Y.Scale > 0.0))
                 or false
         end
-
         if AutoCtx.laneDown[Holder] then
             AutoCtx.release(Holder.Name, keyCode)
             game:GetService('RunService').Heartbeat:Wait()
@@ -1036,16 +1498,13 @@ local function playNoteSequence(Holder, Arrow, keyCode, AutoCtx)
             AutoCtx.press(Holder.Name, keyCode)
             AutoCtx.laneDown[Holder] = true
         end
-
         AutoCtx.laneCount[Holder] = (AutoCtx.laneCount[Holder] or 0) + 1
-
         while Arrow and Arrow.Parent and Arrow.Visible and AutoCtx.enabled do
             if not isHold(Arrow) then
                 break
             end
             task.wait()
         end
-
         AutoCtx.laneCount[Holder] = AutoCtx.laneCount[Holder] - 1
         if AutoCtx.laneCount[Holder] <= 0 then
             AutoCtx.laneCount[Holder] = 0
@@ -1104,7 +1563,10 @@ onChildAdded = function(Object)
     local Map = Keys[#IncomingNotes] or {}
     local Session = {}
     for kn, kv in pairs(Map) do
-        Session[kn] = Enum.KeyCode[Keybinds[kv].Value]
+        local bindObj = Keybinds[kv]
+        local bindValue = resolveKeyName((bindObj and bindObj.Value) or kv)
+        local code = Enum.KeyCode[bindValue] or Enum.KeyCode.Space
+        Session[kn] = code
     end
     if IsOnMobile then
         local mb = Object.Engine:FindFirstChild('MobileButtons')
@@ -1183,9 +1645,7 @@ onChildAdded = function(Object)
     }
     connections:add(Input.ScrollSpeed.Changed, function()
         local newValue = clampScrollSpeed(Input.ScrollSpeed.Value)
-        scrollSpeedUpdating = true
-        sSpd:SetValue(newValue)
-        scrollSpeedUpdating = false
+        setSliderValueFromExternal(newValue)
     end)
     for _, Holder in pairs(IncomingNotes) do
         connections:add(Holder.ChildAdded, function(Arrow)
@@ -1219,23 +1679,51 @@ onChildAdded = function(Object)
     end
 end
 
-connections:add(PlayerGui.ChildAdded, function(o)
-    if o and o.Name == 'FNFEngine' then
-        task.spawn(function()
-            onChildAdded(o)
-        end)
-        if AutoLullaby and not IsOnMobile then
-            ApplyLullabyKeybind(o)
+regGuiListeners = function()
+    connections:add(PlayerGui.ChildAdded, function(o)
+        if o and o.Name == 'FNFEngine' then
+            if AutoLullaby and not IsOnMobile then
+                setupLullaby(o)
+            end
+            applyMods(true)
         end
+        if o and o.Name == 'GameUI' then
+            attachScrollWatcher()
+        end
+    end)
+    connections:add(PlayerGui.ChildAdded, function(o)
+        if o and o.Name == 'FNFEngine' then
+            task.spawn(function()
+                onChildAdded(o)
+            end)
+        end
+    end)
+    connections:add(PlayerGui.ChildRemoved, function(o)
+        if o and o.Name == 'FNFEngine' then
+            task.spawn(resetLullaby)
+            scan()
+        end
+        if o and o.Name == 'GameUI' then
+            detachScrollWatcher()
+        end
+    end)
+    local existingEngine = PlayerGui:FindFirstChild('FNFEngine')
+    if existingEngine then
+        if AutoLullaby and not IsOnMobile then
+            setupLullaby(existingEngine)
+        end
+        applyMods(true)
+        task.spawn(function()
+            onChildAdded(existingEngine)
+        end)
     end
-end)
-connections:add(PlayerGui.ChildRemoved, function(o)
-    if o and o.Name == 'FNFEngine' then
-        task.spawn(RestoreLullabyKeybind)
-        scan()
+    local existingGameUI = PlayerGui:FindFirstChild('GameUI')
+    if existingGameUI then
+        attachScrollWatcher()
     end
-end)
-task.spawn(onChildAdded, PlayerGui:FindFirstChild('FNFEngine'))
+end
+
+regGuiListeners()
 scan()
 
 for _, v in pairs(workspace:GetDescendants()) do
