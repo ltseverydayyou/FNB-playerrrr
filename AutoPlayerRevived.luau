@@ -287,7 +287,14 @@ local AutoModFlags = {
 }
 
 local ModifierList = {
-    Hard = { 'Death', 'FadeIn', 'FadeOut', 'Pendulum', 'Perfect', 'SuddenDeath' },
+    Hard = {
+        'Death',
+        'FadeIn',
+        'FadeOut',
+        'Pendulum',
+        'Perfect',
+        'SuddenDeath',
+    },
     Normal = { 'GhostTapping', 'Mirror', 'Random' },
 }
 
@@ -487,11 +494,8 @@ end
 local function getModButton(kind, name)
     local engineGui = PlayerGui:FindFirstChild('FNFEngine')
     local engine = engineGui and engineGui:FindFirstChild('Engine')
-    local button = findModButton(
-        engine and engine:FindFirstChild('Modifiers'),
-        kind,
-        name
-    )
+    local button =
+        findModButton(engine and engine:FindFirstChild('Modifiers'), kind, name)
     if button then
         return button
     end
@@ -630,7 +634,8 @@ local function hookPend(pend)
         LullabySpamToken += 1
         local token = LullabySpamToken
         task.spawn(function()
-            while AutoLullaby
+            while
+                AutoLullaby
                 and LullabyBeatArmed
                 and token == LullabySpamToken
             do
@@ -707,13 +712,12 @@ local function setupLullaby(eng)
     end
     forceButtonABind()
     LullabyConnKey = spaceBind
-        and spaceBind:GetPropertyChangedSignal('Value')
-            :Connect(function()
-                if not AutoLullaby or LullabyRebinding then
-                    return
-                end
-                forceButtonABind()
-            end)
+        and spaceBind:GetPropertyChangedSignal('Value'):Connect(function()
+            if not AutoLullaby or LullabyRebinding then
+                return
+            end
+            forceButtonABind()
+        end)
     local engine = eng:FindFirstChild('Engine')
     if not engine then
         return
@@ -916,12 +920,13 @@ local function attachScrollWatcher()
         end
         scrollSpeedButtonConn =
             button:GetPropertyChangedSignal('Text'):Connect(onTextChanged)
-        scrollSpeedButtonAncestryConn =
-            button.AncestryChanged:Connect(function(_, parent)
+        scrollSpeedButtonAncestryConn = button.AncestryChanged:Connect(
+            function(_, parent)
                 if not parent then
-        attachScrollWatcher()
+                    attachScrollWatcher()
                 end
-            end)
+            end
+        )
         onTextChanged()
     end)
 end
@@ -1490,9 +1495,7 @@ local function playNoteSequence(Holder, Arrow, keyCode, AutoCtx)
         end
         if AutoCtx.laneDown[Holder] then
             AutoCtx.release(Holder.Name, keyCode)
-            game:GetService('RunService').Heartbeat:Wait()
             AutoCtx.press(Holder.Name, keyCode)
-            game:GetService('RunService').Heartbeat:Wait()
             AutoCtx.laneDown[Holder] = true
         else
             AutoCtx.press(Holder.Name, keyCode)
