@@ -103,7 +103,7 @@ return setmetatable(t, {
         if not s then
             return nil
         end
-        if s < 0.5 or s > 50.0 then
+        if s < 0.5 or s > 200.0 then
             return nil
         end
         local snap = math.floor(s * 10 + 0.5) / 10

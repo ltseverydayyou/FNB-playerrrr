@@ -184,8 +184,8 @@ local function clampScrollSpeed(value)
     if n < 0.5 then
         return 0.5
     end
-    if n > 50 then
-        return 50
+    if n > 200 then
+        return 200
     end
     return n
 end
@@ -935,7 +935,7 @@ sSpd = MainControls:AddSlider('ScrollSpeed', {
     Text = 'Scroll Speed',
     Default = scrollSpeedDefault,
     Min = 0.5,
-    Max = 50,
+    Max = 200,
     Rounding = 1,
     Suffix = 'x',
     Callback = function(v)
@@ -950,7 +950,7 @@ sSpd = MainControls:AddSlider('ScrollSpeed', {
 
 MainControls:AddInput('ScrollSpeedInput', {
     Text = 'Speed override',
-    Placeholder = '0.5 - 50.0',
+    Placeholder = '0.5 - 200.0',
     Finished = true,
     Numeric = true,
     ClearTextOnFocus = false,
@@ -963,24 +963,24 @@ MainControls:AddInput('ScrollSpeedInput', {
 sMs = MainControls:AddSlider('HitOffset', {
     Text = 'Hit offset',
     Default = 0,
-    Min = -100,
-    Max = 100,
+    Min = -500,
+    Max = 500,
     Rounding = 1,
     Suffix = 'ms',
     Callback = function(v)
-        local value = math.clamp(tonumber(v) or 0, -100, 100)
+        local value = math.clamp(tonumber(v) or 0, -500, 500)
         OffsetMs = value
     end,
 })
 
 MainControls:AddInput('HitOffsetInput', {
     Text = 'Offset override',
-    Placeholder = '-100 - 100',
+    Placeholder = '-500 - 500',
     Finished = true,
     Numeric = true,
     ClearTextOnFocus = false,
     Callback = function(v)
-        local n = math.clamp(tonumber(v) or 0, -100, 100)
+        local n = math.clamp(tonumber(v) or 0, -500, 500)
         sMs:SetValue(n)
         OffsetMs = n
     end,
