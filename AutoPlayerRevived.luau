@@ -20,6 +20,14 @@ local connections = {
     end,
 }
 
+local watchers = {
+    scrollBtn = nil,
+    scrollAnces = nil,
+    solo = nil,
+    songChild = nil,
+    songVis = nil,
+}
+
 local spLimit = 15
 local SplashIndex = math.random(1, spLimit)
 local SplashText
@@ -179,7 +187,7 @@ local Keys = {
     },
 }
 
-local function clampScrollSpeed(value)
+local function clampSpeed(value)
     local n = tonumber(value) or 1
     if n < 0.5 then
         return 0.5
@@ -190,10 +198,10 @@ local function clampScrollSpeed(value)
     return n
 end
 
-local scrollSpeedDefault = clampScrollSpeed(
+local defSpeed = clampSpeed(
     (Input and Input.ScrollSpeed and tonumber(Input.ScrollSpeed.Value)) or 1
 )
-local currentScrollSpeed = scrollSpeedDefault
+local curSpeed = defSpeed
 
 local RPCDetailsPrefix = ''
 local RPCStatePrefix = ''
@@ -778,16 +786,49 @@ end
 
 local MainControls = TabMain:AddLeftGroupbox('Autoplayer')
 local MiscControls = TabMain:AddRightGroupbox('Options')
-local AutoModsHard = TabMain:AddRightGroupbox('Auto Modifiers (Hard)')
-local AutoModsNormal = TabMain:AddRightGroupbox('Auto Modifiers (Normal)')
+local AutoModsGroup = TabMain:AddRightGroupbox('Auto Modifiers')
 
 local tAuto
 local sSpd
 local sMs
 local hideMobileToggle
+local soloToggle
 local modeDropdown
 local brpcToggle
 local cursorToggle
+
+local function doSolo(singleplayerUI)
+    local sp = singleplayerUI or PlayerGui:FindFirstChild('SingleplayerUI')
+    if not sp then
+        return false
+    end
+    local remote = sp:FindFirstChild('ButtonPressed')
+        or sp:WaitForChild('ButtonPressed', 2)
+    if not remote then
+        return false
+    end
+    remote:FireServer()
+    return true
+end
+
+local function watchSolo(enabled)
+    if watchers.solo then
+        watchers.solo:Disconnect()
+        watchers.solo = nil
+    end
+    if not enabled then
+        return
+    end
+    watchers.solo = PlayerGui.ChildAdded:Connect(function(child)
+        if child and child.Name == 'SingleplayerUI' then
+            doSolo(child)
+        end
+    end)
+    local existing = PlayerGui:FindFirstChild('SingleplayerUI')
+    if existing then
+        doSolo(existing)
+    end
+end
 
 tAuto = MainControls:AddToggle('AutoplayerToggle', {
     Text = 'Autoplayer',
@@ -820,18 +861,13 @@ if not IsOnMobile then
         Client.Character:BreakJoints()
     end)
     createKeybind('Instant Solo', 'SoloKey', 'PageDown', function()
-        local ui = Client.PlayerGui:FindFirstChild('SingleplayerUI')
-        if ui then
-            ui.ButtonPressed:FireServer()
-        end
+        doSolo()
     end)
 end
 
 local scrollSpeedUpdating = false
-local scrollSpeedButtonConn
-local scrollSpeedButtonAncestryConn
 
-local function pushScrollSpeed(value)
+local function pushSpeed(value)
     RE:FireServer('REMOTE_EVENT', {
         buffer.fromstring('"Input"'),
         buffer.fromstring(tostring(value)),
@@ -839,9 +875,9 @@ local function pushScrollSpeed(value)
     })
 end
 
-local function setSliderValueFromExternal(value)
-    local clamped = clampScrollSpeed(value)
-    currentScrollSpeed = clamped
+local function syncSlider(value)
+    local clamped = clampSpeed(value)
+    curSpeed = clamped
     if not sSpd then
         return
     end
@@ -869,21 +905,21 @@ local function syncSliderWithScrollSpeedButton(button)
     if not parsed then
         return
     end
-    local clamped = clampScrollSpeed(parsed)
-    if math.abs(clamped - currentScrollSpeed) < 0.001 then
+        local clamped = clampSpeed(parsed)
+    if math.abs(clamped - curSpeed) < 0.001 then
         return
     end
-    setSliderValueFromExternal(clamped)
+            syncSlider(clamped)
 end
 
 local function detachScrollWatcher()
-    if scrollSpeedButtonConn then
-        scrollSpeedButtonConn:Disconnect()
-        scrollSpeedButtonConn = nil
+    if watchers.scrollBtn then
+        watchers.scrollBtn:Disconnect()
+        watchers.scrollBtn = nil
     end
-    if scrollSpeedButtonAncestryConn then
-        scrollSpeedButtonAncestryConn:Disconnect()
-        scrollSpeedButtonAncestryConn = nil
+    if watchers.scrollAnces then
+        watchers.scrollAnces:Disconnect()
+        watchers.scrollAnces = nil
     end
 end
 
@@ -918,9 +954,9 @@ local function attachScrollWatcher()
         local function onTextChanged()
             syncSliderWithScrollSpeedButton(button)
         end
-        scrollSpeedButtonConn =
+        watchers.scrollBtn =
             button:GetPropertyChangedSignal('Text'):Connect(onTextChanged)
-        scrollSpeedButtonAncestryConn = button.AncestryChanged:Connect(
+        watchers.scrollAnces = button.AncestryChanged:Connect(
             function(_, parent)
                 if not parent then
                     attachScrollWatcher()
@@ -931,9 +967,52 @@ local function attachScrollWatcher()
     end)
 end
 
+local function clearSongWatch()
+    if watchers.songVis then
+        watchers.songVis:Disconnect()
+        watchers.songVis = nil
+    end
+    if watchers.songChild then
+        watchers.songChild:Disconnect()
+        watchers.songChild = nil
+    end
+end
+
+local function bindSongVis(songSelect)
+    if not songSelect then
+        return
+    end
+    if watchers.songVis then
+        watchers.songVis:Disconnect()
+        watchers.songVis = nil
+    end
+    watchers.songVis = songSelect:GetPropertyChangedSignal('Visible'):Connect(function()
+        if songSelect.Visible then
+            applyMods(true)
+        end
+    end)
+    if songSelect.Visible then
+        applyMods(true)
+    end
+end
+
+local function watchSongSel(gameUI)
+    clearSongWatch()
+    if not gameUI then
+        return
+    end
+    local function onChildAdded(child)
+        if child and child.Name == 'SongSelect' then
+            bindSongVis(child)
+        end
+    end
+    watchers.songChild = gameUI.ChildAdded:Connect(onChildAdded)
+    onChildAdded(gameUI:FindFirstChild('SongSelect'))
+end
+
 sSpd = MainControls:AddSlider('ScrollSpeed', {
     Text = 'Scroll Speed',
-    Default = scrollSpeedDefault,
+    Default = defSpeed,
     Min = 0.5,
     Max = 200,
     Rounding = 1,
@@ -942,9 +1021,9 @@ sSpd = MainControls:AddSlider('ScrollSpeed', {
         if scrollSpeedUpdating then
             return
         end
-        local sv = clampScrollSpeed(v)
-        currentScrollSpeed = sv
-        pushScrollSpeed(sv)
+        local sv = clampSpeed(v)
+        curSpeed = sv
+        pushSpeed(sv)
     end,
 })
 
@@ -955,7 +1034,7 @@ MainControls:AddInput('ScrollSpeedInput', {
     Numeric = true,
     ClearTextOnFocus = false,
     Callback = function(v)
-        local n = clampScrollSpeed(v)
+        local n = clampSpeed(v)
         sSpd:SetValue(n)
     end,
 })
@@ -1028,8 +1107,16 @@ MiscControls:AddButton('Instant Solo', {
     Func = function()
         local sp = PlayerGui:WaitForChild('SingleplayerUI', 2)
         if sp then
-            sp.ButtonPressed:FireServer()
+            doSolo(sp)
         end
+    end,
+})
+
+soloToggle = MiscControls:AddToggle('AutoSolo', {
+    Text = 'Auto Solo',
+    Default = false,
+    Callback = function(v)
+        watchSolo(v)
     end,
 })
 
@@ -1050,7 +1137,8 @@ if actorsAPI then
     })
 end
 
-AutoModsHard:AddToggle('AM_Hard_Death', {
+AutoModsGroup:AddLabel('Hard Modifiers')
+AutoModsGroup:AddToggle('AM_Hard_Death', {
     Text = 'Death',
     Default = false,
     Callback = function(v)
@@ -1058,7 +1146,7 @@ AutoModsHard:AddToggle('AM_Hard_Death', {
         queueModApply('Hard', 'Death', v)
     end,
 })
-AutoModsHard:AddToggle('AM_Hard_FadeIn', {
+AutoModsGroup:AddToggle('AM_Hard_FadeIn', {
     Text = 'FadeIn',
     Default = false,
     Callback = function(v)
@@ -1066,7 +1154,7 @@ AutoModsHard:AddToggle('AM_Hard_FadeIn', {
         queueModApply('Hard', 'FadeIn', v)
     end,
 })
-AutoModsHard:AddToggle('AM_Hard_FadeOut', {
+AutoModsGroup:AddToggle('AM_Hard_FadeOut', {
     Text = 'FadeOut',
     Default = false,
     Callback = function(v)
@@ -1074,7 +1162,7 @@ AutoModsHard:AddToggle('AM_Hard_FadeOut', {
         queueModApply('Hard', 'FadeOut', v)
     end,
 })
-AutoModsHard:AddToggle('AM_Hard_Pendulum', {
+AutoModsGroup:AddToggle('AM_Hard_Pendulum', {
     Text = 'Pendulum',
     Default = false,
     Callback = function(v)
@@ -1082,7 +1170,7 @@ AutoModsHard:AddToggle('AM_Hard_Pendulum', {
         queueModApply('Hard', 'Pendulum', v)
     end,
 })
-AutoModsHard:AddToggle('AM_Hard_Perfect', {
+AutoModsGroup:AddToggle('AM_Hard_Perfect', {
     Text = 'Perfect',
     Default = false,
     Callback = function(v)
@@ -1090,7 +1178,7 @@ AutoModsHard:AddToggle('AM_Hard_Perfect', {
         queueModApply('Hard', 'Perfect', v)
     end,
 })
-AutoModsHard:AddToggle('AM_Hard_SuddenDeath', {
+AutoModsGroup:AddToggle('AM_Hard_SuddenDeath', {
     Text = 'SuddenDeath',
     Default = false,
     Callback = function(v)
@@ -1099,7 +1187,9 @@ AutoModsHard:AddToggle('AM_Hard_SuddenDeath', {
     end,
 })
 
-AutoModsNormal:AddToggle('AM_Normal_GhostTapping', {
+AutoModsGroup:AddDivider()
+AutoModsGroup:AddLabel('Normal Modifiers')
+AutoModsGroup:AddToggle('AM_Normal_GhostTapping', {
     Text = 'GhostTapping',
     Default = false,
     Callback = function(v)
@@ -1107,7 +1197,7 @@ AutoModsNormal:AddToggle('AM_Normal_GhostTapping', {
         queueModApply('Normal', 'GhostTapping', v)
     end,
 })
-AutoModsNormal:AddToggle('AM_Normal_Mirror', {
+AutoModsGroup:AddToggle('AM_Normal_Mirror', {
     Text = 'Mirror',
     Default = false,
     Callback = function(v)
@@ -1115,7 +1205,7 @@ AutoModsNormal:AddToggle('AM_Normal_Mirror', {
         queueModApply('Normal', 'Mirror', v)
     end,
 })
-AutoModsNormal:AddToggle('AM_Normal_Random', {
+AutoModsGroup:AddToggle('AM_Normal_Random', {
     Text = 'Random',
     Default = false,
     Callback = function(v)
@@ -1647,8 +1737,8 @@ onChildAdded = function(Object)
         release = releaseLane,
     }
     connections:add(Input.ScrollSpeed.Changed, function()
-        local newValue = clampScrollSpeed(Input.ScrollSpeed.Value)
-        setSliderValueFromExternal(newValue)
+        local newValue = clampSpeed(Input.ScrollSpeed.Value)
+        syncSlider(newValue)
     end)
     for _, Holder in pairs(IncomingNotes) do
         connections:add(Holder.ChildAdded, function(Arrow)
@@ -1692,6 +1782,7 @@ regGuiListeners = function()
         end
         if o and o.Name == 'GameUI' then
             attachScrollWatcher()
+            watchSongSel(o)
         end
     end)
     connections:add(PlayerGui.ChildAdded, function(o)
@@ -1708,6 +1799,7 @@ regGuiListeners = function()
         end
         if o and o.Name == 'GameUI' then
             detachScrollWatcher()
+            clearSongWatch()
         end
     end)
     local existingEngine = PlayerGui:FindFirstChild('FNFEngine')
@@ -1723,6 +1815,7 @@ regGuiListeners = function()
     local existingGameUI = PlayerGui:FindFirstChild('GameUI')
     if existingGameUI then
         attachScrollWatcher()
+        watchSongSel(existingGameUI)
     end
 end
 
