@@ -91,6 +91,11 @@ local ReplicatedStorage = game:GetService('ReplicatedStorage')
 local RE = ReplicatedStorage:WaitForChild('Modules')
     :WaitForChild('Network')
     :WaitForChild('RE')
+local RF = ReplicatedStorage:WaitForChild('Modules')
+    :WaitForChild('Network')
+    :WaitForChild('RF')
+
+local TakeDamageRemote
 
 local IsOnMobile = (function()
     local p = UserInputService:GetPlatform()
@@ -265,6 +270,7 @@ local LullabyConnBG, LullabyConnPend, LullabyBeatArmed, LullabyConnKey =
 local LullabySpamToken = 0
 local LullabySpamInterval = 0
 local LullabyRebinding = false
+local AntiMissEnabled = false
 local function resolveKeyName(value)
     if value == nil then
         return 'Space'
@@ -796,6 +802,7 @@ local soloToggle
 local modeDropdown
 local brpcToggle
 local cursorToggle
+local antiMissToggle
 
 local function doSolo(singleplayerUI)
     local sp = singleplayerUI or PlayerGui:FindFirstChild('SingleplayerUI')
@@ -905,11 +912,11 @@ local function syncSliderWithScrollSpeedButton(button)
     if not parsed then
         return
     end
-        local clamped = clampSpeed(parsed)
+    local clamped = clampSpeed(parsed)
     if math.abs(clamped - curSpeed) < 0.001 then
         return
     end
-            syncSlider(clamped)
+    syncSlider(clamped)
 end
 
 local function detachScrollWatcher()
@@ -986,11 +993,13 @@ local function bindSongVis(songSelect)
         watchers.songVis:Disconnect()
         watchers.songVis = nil
     end
-    watchers.songVis = songSelect:GetPropertyChangedSignal('Visible'):Connect(function()
-        if songSelect.Visible then
-            applyMods(true)
-        end
-    end)
+    watchers.songVis = songSelect
+        :GetPropertyChangedSignal('Visible')
+        :Connect(function()
+            if songSelect.Visible then
+                applyMods(true)
+            end
+        end)
     if songSelect.Visible then
         applyMods(true)
     end
@@ -1117,6 +1126,14 @@ soloToggle = MiscControls:AddToggle('AutoSolo', {
     Default = false,
     Callback = function(v)
         watchSolo(v)
+    end,
+})
+
+antiMissToggle = MiscControls:AddToggle('AntiMiss', {
+    Text = 'Anti Miss',
+    Default = AntiMissEnabled,
+    Callback = function(v)
+        AntiMissEnabled = v and true or false
     end,
 })
 
@@ -1435,9 +1452,10 @@ end
 
 do
     if reqok() then
-        local oldhmmi
-        local oldhmmnc
-        oldhmmi = hookmetamethod(game, '__index', function(self, m)
+        local oldIndex
+        local oldNamecall
+
+        oldIndex = hookmetamethod(game, '__index', function(self, m)
             if
                 not checkcaller()
                 and self == Client
@@ -1449,41 +1467,76 @@ do
                     2
                 )
             end
-            return oldhmmi(self, m)
+            return oldIndex(self, m)
         end)
-        oldhmmnc = hookmetamethod(
+
+        oldNamecall = hookmetamethod(
             game,
             '__namecall',
             newcclosure(function(self, ...)
                 local l = (getnamecallmethod() or ''):lower()
-                if not checkcaller() and self == Client and l == 'kick' then
-                    return
-                end
-                if not checkcaller() and l == 'findservice' then
-                    local first = ...
-                    if
-                        typeof(first) == 'string'
-                        and first:lower() == 'virtualinputmanager'
-                    then
+
+                if not checkcaller() then
+                    if self == Client and l == 'kick' then
                         return
                     end
-                end
-                if
-                    not checkcaller()
-                    and (l == 'fireserver' or l == 'invokeserver')
-                then
+
+                    if l == 'findservice' then
+                        local first = ...
+                        if
+                            typeof(first) == 'string'
+                            and first:lower() == 'virtualinputmanager'
+                        then
+                            return
+                        end
+                    end
+
                     if
                         typeof(self) == 'Instance'
-                        and tostring(self.Name):lower() == 'userinputasync'
+                        and (l == 'fireserver' or l == 'invokeserver')
                     then
-                        return
+                        local name = tostring(self.Name)
+
+                        if name:lower() == 'userinputasync' then
+                            return
+                        end
+
+                        if self == TakeDamageRemote then
+                            return
+                        end
+
+                        if
+                            name == 'TakeDamage'
+                            and self.Parent
+                            and self.Parent.Name == 'Engine'
+                        then
+                            return
+                        end
+
+                        if self == RF and AntiMissEnabled then
+                            local args = { ... }
+                            local payload = args[2]
+                            if typeof(payload) == 'table' then
+                                local stateBuf = payload[1]
+                                if typeof(stateBuf) == 'buffer' then
+                                    local state = buffer.tostring(stateBuf)
+                                    if state and state:find('Miss') then
+                                        return
+                                    end
+                                end
+                            end
+                            return oldNamecall(self, table.unpack(args))
+                        end
                     end
                 end
-                return oldhmmnc(self, ...)
+
+                return oldNamecall(self, ...)
             end)
         )
+
         local real_require = require
         local patched = setmetatable({}, { __mode = 'k' })
+
         require = function(mod)
             local ok, obj = pcall(real_require, mod)
             if not ok then
@@ -1745,16 +1798,26 @@ onChildAdded = function(Object)
             if not Arrow or not Arrow.Visible then
                 return
             end
+
+            local arrowName = tostring(Arrow.Name or '')
+            local isOrange = arrowName:find('_OrangeNote', 1, true) ~= nil
+
             if
                 Arrow:FindFirstChild('HellNote')
                 and Arrow.HellNote.Value
                 and PoisonNotes
+                and not isOrange
             then
                 return
             end
-            if IsOnHit(Arrow:FindFirstChildOfClass('ModuleScript')) then
+
+            if
+                not isOrange
+                and IsOnHit(Arrow:FindFirstChildOfClass('ModuleScript'))
+            then
                 return
             end
+
             local keyCode = Session[Holder.Name]
             if not keyCode then
                 return
@@ -1762,11 +1825,13 @@ onChildAdded = function(Object)
             if not AutoEnabled then
                 return
             end
+
             AutoCtx.enabled = AutoEnabled
             AutoCtx.offsetMs = OffsetMs
             AutoCtx.baseOffset = computeBaseOffset(
                 (Input.ScrollSpeedChange.Value and Input.ScrollSpeed.Value) or 1
             )
+
             playNoteSequence(Holder, Arrow, keyCode, AutoCtx)
         end)
     end
@@ -1802,12 +1867,30 @@ regGuiListeners = function()
             clearSongWatch()
         end
     end)
+
+    connections:add(PlayerGui.DescendantAdded, function(o)
+        if
+            o.Name == 'TakeDamage'
+            and o.Parent
+            and o.Parent.Name == 'Engine'
+        then
+            TakeDamageRemote = o
+        end
+    end)
+
     local existingEngine = PlayerGui:FindFirstChild('FNFEngine')
     if existingEngine then
         if AutoLullaby and not IsOnMobile then
             setupLullaby(existingEngine)
         end
         applyMods(true)
+        local engine = existingEngine:FindFirstChild('Engine')
+        if engine then
+            local td = engine:FindFirstChild('TakeDamage')
+            if td then
+                TakeDamageRemote = td
+            end
+        end
         task.spawn(function()
             onChildAdded(existingEngine)
         end)
