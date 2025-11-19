@@ -1051,24 +1051,24 @@ MainControls:AddInput('ScrollSpeedInput', {
 sMs = MainControls:AddSlider('HitOffset', {
     Text = 'Hit offset',
     Default = 0,
-    Min = -1000,
-    Max = 1000,
+    Min = -500,
+    Max = 500,
     Rounding = 1,
     Suffix = 'ms',
     Callback = function(v)
-        local value = math.clamp(tonumber(v) or 0, -1000, 1000)
+        local value = math.clamp(tonumber(v) or 0, -500, 500)
         OffsetMs = value
     end,
 })
 
 MainControls:AddInput('HitOffsetInput', {
     Text = 'Offset override',
-    Placeholder = '-1000 - 1000',
+    Placeholder = '-500 - 500',
     Finished = true,
     Numeric = true,
     ClearTextOnFocus = false,
     Callback = function(v)
-        local n = math.clamp(tonumber(v) or 0, -1000, 1000)
+        local n = math.clamp(tonumber(v) or 0, -500, 500)
         sMs:SetValue(n)
         OffsetMs = n
     end,
