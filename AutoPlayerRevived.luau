@@ -271,6 +271,8 @@ local LullabySpamToken = 0
 local LullabySpamInterval = 0
 local LullabyRebinding = false
 local AntiMissEnabled = false
+local imode = IsOnMobile and 'Button' or 'Key'
+
 local function resolveKeyName(value)
     if value == nil then
         return 'Space'
@@ -595,202 +597,117 @@ local function applyMods(force)
     end)
 end
 
-local function scan()
-    local eng = PlayerGui:FindFirstChild('FNFEngine')
-    if not eng then
-        lobbyRPC()
-        return
+local function computeBaseOffset(scrollSpeed)
+    local key = string.format('%.1f', tonumber(scrollSpeed) or 1)
+    local ms = Offsets[key]
+    if ms == nil then
+        local fallback = Offsets['10.0'] or 0
+        ms = fallback
     end
-    local engine = eng:FindFirstChild('Engine')
-    local lower = engine and engine:FindFirstChild('LowerContainer')
-    local credit = lower and lower:FindFirstChild('Credit')
-    local det, st = '', ''
-    if credit and credit:IsA('TextLabel') then
-        det, st = parseCredit(credit.Text)
-    end
-    local sid
-    local mods = engine and engine:FindFirstChild('Modifiers')
-    local ghost = mods and mods:FindFirstChild('GhostTapping')
-    if ghost and ghost:IsA('ImageButton') and type(ghost.Image) == 'string' then
-        local d = ghost.Image:match('%d+')
-        sid = d and tonumber(d) or nil
-    end
-    local sideVal = engine
-            and engine:FindFirstChild('PlayerSide')
-            and engine.PlayerSide.Value
-        or 'L'
-    local sh =
-        formatWithPrefix(RPCSidePrefix, sideVal == 'L' and 'Left' or 'Right')
-    rpc(det, st, picon(), pname(), sid, sh)
+    return (ms / 1000) + 0.4
 end
 
-local function hookPend(pend)
-    if not pend or not pend:IsA('ImageLabel') then
+local function pressLaneMobile(container, name)
+    if typeof(firesignal) ~= 'function' then
         return
     end
-    if LullabyConnPend then
-        LullabyConnPend:Disconnect()
-        LullabyConnPend = nil
+    if not container then
+        return
     end
-    LullabyBeatArmed = false
-    LullabySpamToken += 1
-    local function stopSpam()
-        if LullabyBeatArmed then
-            LullabyBeatArmed = false
-            LullabySpamToken += 1
-        end
+    local b = container:FindFirstChild(name)
+    if not b and name == 'Space' then
+        b = container:FindFirstChild('SPACE')
+            or container:FindFirstChild('space')
     end
-    local function startSpam()
-        if LullabyBeatArmed then
+    if b then
+        pcall(firesignal, b.MouseButton1Down)
+    end
+end
+
+local function releaseLaneMobile(container, name)
+    if typeof(firesignal) ~= 'function' then
+        return
+    end
+    if not container then
+        return
+    end
+    local b = container:FindFirstChild(name)
+    if not b and name == 'Space' then
+        b = container:FindFirstChild('SPACE')
+            or container:FindFirstChild('space')
+    end
+    if b then
+        pcall(firesignal, b.MouseButton1Up)
+    end
+end
+
+local function actorKey(op, codeName)
+    if Mode ~= 'actor' then
+        return false
+    end
+    local actorsAPI = (
+        typeof(getactors) == 'function' and typeof(run_on_actor) == 'function'
+    )
+    if not actorsAPI then
+        return false
+    end
+    local okA, actors = pcall(getactors)
+    if not okA or type(actors) ~= 'table' or not actors[1] then
+        return false
+    end
+    local src = 'local vim=game:GetService("VirtualInputManager");vim:SendKeyEvent('
+        .. (op == 'press' and 'true' or 'false')
+        .. ', Enum.KeyCode['
+        .. string.format('%q', codeName)
+        .. '], false, nil)'
+    pcall(run_on_actor, actors[1], src)
+    return false
+end
+
+local function playNoteSequence(Holder, Arrow, keyCode, AutoCtx)
+    task.spawn(function()
+        local baseOffset = AutoCtx.baseOffset
+        task.wait(baseOffset + (AutoCtx.offsetMs / 1000))
+        if not AutoCtx.enabled then
             return
         end
-        LullabyBeatArmed = true
-        LullabySpamToken += 1
-        local token = LullabySpamToken
-        task.spawn(function()
-            while
-                AutoLullaby
-                and LullabyBeatArmed
-                and token == LullabySpamToken
-            do
-                local rotation = tonumber(pend.Rotation) or 0
-                if rotation < -7 or rotation > 7 then
-                    break
-                end
-                LullabyTap()
-                if LullabySpamInterval and LullabySpamInterval > 0 then
-                    task.wait(LullabySpamInterval)
-                else
-                    task.wait()
-                end
-            end
-            if token == LullabySpamToken then
-                LullabyBeatArmed = false
-            end
-        end)
-    end
-    local function evaluate()
-        local r = tonumber(pend.Rotation) or 0
-        if r >= -10 and r <= 10 then
-            startSpam()
+        if not Arrow or not Arrow.Parent or not Arrow.Visible then
+            return
+        end
+        local function isHold(a)
+            local f = a:FindFirstChild('Frame')
+            local b = f and f:FindFirstChild('Bar')
+            return (b and b.Size and b.Size.Y and (b.Size.Y.Scale > 0.0))
+                or false
+        end
+        if AutoCtx.laneDown[Holder] then
+            AutoCtx.release(Holder.Name, keyCode)
+            AutoCtx.press(Holder.Name, keyCode)
+            AutoCtx.laneDown[Holder] = true
         else
-            stopSpam()
+            AutoCtx.press(Holder.Name, keyCode)
+            AutoCtx.laneDown[Holder] = true
         end
-    end
-    LullabyConnPend = pend:GetPropertyChangedSignal('Rotation')
-        :Connect(function()
-            if not AutoLullaby then
-                return
+        AutoCtx.laneCount[Holder] = (AutoCtx.laneCount[Holder] or 0) + 1
+        while Arrow and Arrow.Parent and Arrow.Visible and AutoCtx.enabled do
+            if not isHold(Arrow) then
+                break
             end
-            evaluate()
-        end)
-    evaluate()
-end
-
-local function setupLullaby(eng)
-    if not AutoLullaby or IsOnMobile then
-        return
-    end
-    if LullabyConnKey then
-        LullabyConnKey:Disconnect()
-        LullabyConnKey = nil
-    end
-    if LullabyConnBG then
-        LullabyConnBG:Disconnect()
-        LullabyConnBG = nil
-    end
-    if LullabyConnPend then
-        LullabyConnPend:Disconnect()
-        LullabyConnPend = nil
-    end
-    LullabyBeatArmed = false
-    LullabySpamToken += 1
-    local spaceBind = getSpaceBind()
-    local current = resolveKeyName(spaceBind and spaceBind.Value or 'Space')
-    if not OriginalSpaceBind then
-        OriginalSpaceBind = current
-    end
-    local function forceButtonABind()
-        local bindObj = getSpaceBind()
-        local now = resolveKeyName(bindObj and bindObj.Value or 'Space')
-        if now == 'ButtonA' then
-            return
+            task.wait()
         end
-        RE:FireServer('REMOTE_EVENT', {
-            buffer.fromstring('"Input"'),
-            buffer.fromstring('"ButtonA"'),
-            buffer.fromstring('"Space"'),
-        })
-        LullabyChanged = true
-        setSpaceBind('ButtonA')
-    end
-    forceButtonABind()
-    LullabyConnKey = spaceBind
-        and spaceBind:GetPropertyChangedSignal('Value'):Connect(function()
-            if not AutoLullaby or LullabyRebinding then
-                return
-            end
-            forceButtonABind()
-        end)
-    local engine = eng:FindFirstChild('Engine')
-    if not engine then
-        return
-    end
-    local bg = engine:FindFirstChild('background')
-    if bg and bg:IsA('Frame') then
-        local pend = bg:FindFirstChild('pendelum')
-        if pend then
-            hookPend(pend)
-        end
-    end
-    LullabyConnBG = engine.ChildAdded:Connect(function(c)
-        if c.Name == 'background' and c:IsA('Frame') then
-            local pend = c:FindFirstChild('pendelum')
-            if pend then
-                hookPend(pend)
-            end
-            if not pend then
-                c.ChildAdded:Connect(function(gc)
-                    if gc.Name == 'pendelum' then
-                        hookPend(gc)
-                    end
-                end)
+        AutoCtx.laneCount[Holder] = AutoCtx.laneCount[Holder] - 1
+        if AutoCtx.laneCount[Holder] <= 0 then
+            AutoCtx.laneCount[Holder] = 0
+            if AutoCtx.laneDown[Holder] then
+                AutoCtx.release(Holder.Name, keyCode)
+                AutoCtx.laneDown[Holder] = false
             end
         end
     end)
 end
 
-local function resetLullaby()
-    if LullabyConnKey then
-        LullabyConnKey:Disconnect()
-        LullabyConnKey = nil
-    end
-    if LullabyConnBG then
-        LullabyConnBG:Disconnect()
-        LullabyConnBG = nil
-    end
-    if LullabyConnPend then
-        LullabyConnPend:Disconnect()
-        LullabyConnPend = nil
-    end
-    LullabyBeatArmed = false
-    if LullabyChanged then
-        RE:FireServer('REMOTE_EVENT', {
-            buffer.fromstring('"Input"'),
-            buffer.fromstring('"Space"'),
-            buffer.fromstring('"Space"'),
-        })
-    end
-    if OriginalSpaceBind then
-        setSpaceBind(OriginalSpaceBind)
-    else
-        setSpaceBind('Space')
-    end
-    LullabyChanged = false
-    OriginalSpaceBind = nil
-end
-
 local MainControls = TabMain:AddLeftGroupbox('Autoplayer')
+local InputTypeGroup = TabMain:AddLeftGroupbox('Input Type')
 local MiscControls = TabMain:AddRightGroupbox('Options')
 local AutoModsGroup = TabMain:AddRightGroupbox('Auto Modifiers')
 
@@ -803,6 +720,7 @@ local modeDropdown
 local brpcToggle
 local cursorToggle
 local antiMissToggle
+local inputModeDropdown
 
 local function doSolo(singleplayerUI)
     local sp = singleplayerUI or PlayerGui:FindFirstChild('SingleplayerUI')
@@ -1154,6 +1072,23 @@ if actorsAPI then
     })
 end
 
+InputTypeGroup:AddLabel({
+    Text = 'For mobile emulators: choose how input is sent (button press vs key press).',
+    DoesWrap = true,
+})
+
+inputModeDropdown = InputTypeGroup:AddDropdown('InputMode', {
+    Text = 'Input mode',
+    Values = { 'Button', 'Key' },
+    Default = imode,
+    Callback = function(opt)
+        local sel = (typeof(opt) == 'table' and opt[1]) or opt
+        if sel == 'Button' or sel == 'Key' then
+            imode = sel
+        end
+    end,
+})
+
 AutoModsGroup:AddLabel('Hard Modifiers')
 AutoModsGroup:AddToggle('AM_Hard_Death', {
     Text = 'Death',
@@ -1438,15 +1373,23 @@ do
             'hookmetamethod/newcclosure/getnamecallmethod/checkcaller'
         )
     end
-    if IsOnMobile and typeof(firesignal) ~= 'function' then
+    if imode == 'Button' and typeof(firesignal) ~= 'function' then
         miss = true
-        notifyMissing('Missing requirement', 'firesignal (needed on mobile)')
+        notifyMissing('Missing requirement', 'firesignal (needed for button input mode)')
     end
     if miss then
         notifyMissing(
             'FNB Autoplayer',
             'One or more requirements are missing; functionality may be limited.'
         )
+    end
+end
+
+do
+    local opts = Obsidian.Options
+    local opt = opts and opts.InputMode
+    if opt and opt.SetValue then
+        opt:SetValue(imode)
     end
 end
 
@@ -1556,110 +1499,199 @@ do
     end
 end
 
-local function computeBaseOffset(scrollSpeed)
-    local key = string.format('%.1f', tonumber(scrollSpeed) or 1)
-    local ms = Offsets[key]
-    if ms == nil then
-        local fallback = Offsets['10.0'] or 0
-        ms = fallback
-    end
-    return (ms / 1000) + 0.4
-end
-
-local function pressLaneMobile(container, name)
-    if typeof(firesignal) ~= 'function' then
+local function scan()
+    local eng = PlayerGui:FindFirstChild('FNFEngine')
+    if not eng then
+        lobbyRPC()
         return
     end
-    if not container then
-        return
+    local engine = eng:FindFirstChild('Engine')
+    local lower = engine and engine:FindFirstChild('LowerContainer')
+    local credit = lower and lower:FindFirstChild('Credit')
+    local det, st = '', ''
+    if credit and credit:IsA('TextLabel') then
+        det, st = parseCredit(credit.Text)
     end
-    local b = container:FindFirstChild(name)
-    if not b and name == 'Space' then
-        b = container:FindFirstChild('SPACE')
-            or container:FindFirstChild('space')
+    local sid
+    local mods = engine and engine:FindFirstChild('Modifiers')
+    local ghost = mods and mods:FindFirstChild('GhostTapping')
+    if ghost and ghost:IsA('ImageButton') and type(ghost.Image) == 'string' then
+        local d = ghost.Image:match('%d+')
+        sid = d and tonumber(d) or nil
     end
-    if b then
-        pcall(firesignal, b.MouseButton1Down)
-    end
+    local sideVal = engine
+            and engine:FindFirstChild('PlayerSide')
+            and engine.PlayerSide.Value
+        or 'L'
+    local sh =
+        formatWithPrefix(RPCSidePrefix, sideVal == 'L' and 'Left' or 'Right')
+    rpc(det, st, picon(), pname(), sid, sh)
 end
 
-local function releaseLaneMobile(container, name)
-    if typeof(firesignal) ~= 'function' then
+local function hookPend(pend)
+    if not pend or not pend:IsA('ImageLabel') then
         return
     end
-    if not container then
-        return
+    if LullabyConnPend then
+        LullabyConnPend:Disconnect()
+        LullabyConnPend = nil
     end
-    local b = container:FindFirstChild(name)
-    if not b and name == 'Space' then
-        b = container:FindFirstChild('SPACE')
-            or container:FindFirstChild('space')
+    LullabyBeatArmed = false
+    LullabySpamToken += 1
+    local function stopSpam()
+        if LullabyBeatArmed then
+            LullabyBeatArmed = false
+            LullabySpamToken += 1
+        end
     end
-    if b then
-        pcall(firesignal, b.MouseButton1Up)
-    end
-end
-
-local function actorKey(op, codeName)
-    if Mode ~= 'actor' then
-        return false
-    end
-    if not actorsAPI then
-        return false
-    end
-    local okA, actors = pcall(getactors)
-    if not okA or type(actors) ~= 'table' or not actors[1] then
-        return false
-    end
-    local src = 'local vim=game:GetService("VirtualInputManager");vim:SendKeyEvent('
-        .. (op == 'press' and 'true' or 'false')
-        .. ', Enum.KeyCode['
-        .. string.format('%q', codeName)
-        .. '], false, nil)'
-    pcall(run_on_actor, actors[1], src)
-    return false
-end
-
-local function playNoteSequence(Holder, Arrow, keyCode, AutoCtx)
-    task.spawn(function()
-        local baseOffset = AutoCtx.baseOffset
-        task.wait(baseOffset + (AutoCtx.offsetMs / 1000))
-        if not AutoCtx.enabled then
+    local function startSpam()
+        if LullabyBeatArmed then
             return
         end
-        if not Arrow or not Arrow.Parent or not Arrow.Visible then
-            return
-        end
-        local function isHold(a)
-            local f = a:FindFirstChild('Frame')
-            local b = f and f:FindFirstChild('Bar')
-            return (b and b.Size and b.Size.Y and (b.Size.Y.Scale > 0.0))
-                or false
-        end
-        if AutoCtx.laneDown[Holder] then
-            AutoCtx.release(Holder.Name, keyCode)
-            AutoCtx.press(Holder.Name, keyCode)
-            AutoCtx.laneDown[Holder] = true
-        else
-            AutoCtx.press(Holder.Name, keyCode)
-            AutoCtx.laneDown[Holder] = true
-        end
-        AutoCtx.laneCount[Holder] = (AutoCtx.laneCount[Holder] or 0) + 1
-        while Arrow and Arrow.Parent and Arrow.Visible and AutoCtx.enabled do
-            if not isHold(Arrow) then
-                break
+        LullabyBeatArmed = true
+        LullabySpamToken += 1
+        local token = LullabySpamToken
+        task.spawn(function()
+            while
+                AutoLullaby
+                and LullabyBeatArmed
+                and token == LullabySpamToken
+            do
+                local rotation = tonumber(pend.Rotation) or 0
+                if rotation < -7 or rotation > 7 then
+                    break
+                end
+                LullabyTap()
+                if LullabySpamInterval and LullabySpamInterval > 0 then
+                    task.wait(LullabySpamInterval)
+                else
+                    task.wait()
+                end
             end
-            task.wait()
+            if token == LullabySpamToken then
+                LullabyBeatArmed = false
+            end
+        end)
+    end
+    local function evaluate()
+        local r = tonumber(pend.Rotation) or 0
+        if r >= -10 and r <= 10 then
+            startSpam()
+        else
+            stopSpam()
         end
-        AutoCtx.laneCount[Holder] = AutoCtx.laneCount[Holder] - 1
-        if AutoCtx.laneCount[Holder] <= 0 then
-            AutoCtx.laneCount[Holder] = 0
-            if AutoCtx.laneDown[Holder] then
-                AutoCtx.release(Holder.Name, keyCode)
-                AutoCtx.laneDown[Holder] = false
+    end
+    LullabyConnPend = pend:GetPropertyChangedSignal('Rotation')
+        :Connect(function()
+            if not AutoLullaby then
+                return
+            end
+            evaluate()
+        end)
+    evaluate()
+end
+
+function setupLullaby(eng)
+    if not AutoLullaby or IsOnMobile then
+        return
+    end
+    if LullabyConnKey then
+        LullabyConnKey:Disconnect()
+        LullabyConnKey = nil
+    end
+    if LullabyConnBG then
+        LullabyConnBG:Disconnect()
+        LullabyConnBG = nil
+    end
+    if LullabyConnPend then
+        LullabyConnPend:Disconnect()
+        LullabyConnPend = nil
+    end
+    LullabyBeatArmed = false
+    LullabySpamToken += 1
+    local spaceBind = getSpaceBind()
+    local current = resolveKeyName(spaceBind and spaceBind.Value or 'Space')
+    if not OriginalSpaceBind then
+        OriginalSpaceBind = current
+    end
+    local function forceButtonABind()
+        local bindObj = getSpaceBind()
+        local now = resolveKeyName(bindObj and bindObj.Value or 'Space')
+        if now == 'ButtonA' then
+            return
+        end
+        RE:FireServer('REMOTE_EVENT', {
+            buffer.fromstring('"Input"'),
+            buffer.fromstring('"ButtonA"'),
+            buffer.fromstring('"Space"'),
+        })
+        LullabyChanged = true
+        setSpaceBind('ButtonA')
+    end
+    forceButtonABind()
+    LullabyConnKey = spaceBind
+        and spaceBind:GetPropertyChangedSignal('Value'):Connect(function()
+            if not AutoLullaby or LullabyRebinding then
+                return
+            end
+            forceButtonABind()
+        end)
+    local engine = eng:FindFirstChild('Engine')
+    if not engine then
+        return
+    end
+    local bg = engine:FindFirstChild('background')
+    if bg and bg:IsA('Frame') then
+        local pend = bg:FindFirstChild('pendelum')
+        if pend then
+            hookPend(pend)
+        end
+    end
+    LullabyConnBG = engine.ChildAdded:Connect(function(c)
+        if c.Name == 'background' and c:IsA('Frame') then
+            local pend = c:FindFirstChild('pendelum')
+            if pend then
+                hookPend(pend)
+            end
+            if not pend then
+                c.ChildAdded:Connect(function(gc)
+                    if gc.Name == 'pendelum' then
+                        hookPend(gc)
+                    end
+                end)
             end
         end
     end)
+end
+
+local function resetLullaby()
+    if LullabyConnKey then
+        LullabyConnKey:Disconnect()
+        LullabyConnKey = nil
+    end
+    if LullabyConnBG then
+        LullabyConnBG:Disconnect()
+        LullabyConnBG = nil
+    end
+    if LullabyConnPend then
+        LullabyConnPend:Disconnect()
+        LullabyConnPend = nil
+    end
+    LullabyBeatArmed = false
+    if LullabyChanged then
+        RE:FireServer('REMOTE_EVENT', {
+            buffer.fromstring('"Input"'),
+            buffer.fromstring('"Space"'),
+            buffer.fromstring('"Space"'),
+        })
+    end
+    if OriginalSpaceBind then
+        setSpaceBind(OriginalSpaceBind)
+    else
+        setSpaceBind('Space')
+    end
+    LullabyChanged = false
+    OriginalSpaceBind = nil
 end
 
 onChildAdded = function(Object)
@@ -1725,7 +1757,7 @@ onChildAdded = function(Object)
     local MobileContainer = MobileButtons
         and MobileButtons:FindFirstChild('Container')
     local function pressLane(name, keyCode)
-        if IsOnMobile then
+        if imode == 'Button' then
             pressLaneMobile(MobileContainer, name)
             return
         end
@@ -1735,12 +1767,10 @@ onChildAdded = function(Object)
             end
             return
         end
-        if IsOnPC then
-            VirtualInputManager:SendKeyEvent(true, keyCode, false, nil)
-        end
+        VirtualInputManager:SendKeyEvent(true, keyCode, false, nil)
     end
     local function releaseLane(name, keyCode)
-        if IsOnMobile then
+        if imode == 'Button' then
             releaseLaneMobile(MobileContainer, name)
             return
         end
@@ -1750,9 +1780,7 @@ onChildAdded = function(Object)
             end
             return
         end
-        if IsOnPC then
-            VirtualInputManager:SendKeyEvent(false, keyCode, false, nil)
-        end
+        VirtualInputManager:SendKeyEvent(false, keyCode, false, nil)
     end
     local laneDown = {}
     local laneCount = {}
