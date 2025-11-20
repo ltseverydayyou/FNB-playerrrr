@@ -1532,7 +1532,7 @@ onChildAdded = function(Object)
     if IsOnMobile then
         local mb = Object.Engine:FindFirstChild('MobileButtons')
         local cont = mb and mb:FindFirstChild('Container')
-        if count and cont.Visible then
+        if count and (count:FindFirstChildOfClass("ImageButton").Visible or count:FindFirstChildOfClass("TextButton").Visible) then
             if HideMobileBtns then
                 cont.Visible = false
             end
