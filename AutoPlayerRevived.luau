@@ -262,16 +262,8 @@ local regGuiListeners
 local HideMobileBtns = true
 local BRPCEnabled = true
 local Mode = 'normal'
-local AutoLullaby = AutoLullaby or false
-local LullabyChanged = LullabyChanged or false
-local OriginalSpaceBind = OriginalSpaceBind or nil
-local LullabyConnBG, LullabyConnPend, LullabyBeatArmed, LullabyConnKey =
-    nil, nil, false, nil
-local LullabySpamToken = 0
-local LullabySpamInterval = 0
-local LullabyRebinding = false
 local AntiMissEnabled = false
-local imode = IsOnMobile and 'Button' or 'Key'
+local imode = 'Key'
 
 local function resolveKeyName(value)
     if value == nil then
@@ -395,14 +387,6 @@ local function parseCredit(txt)
     return ln1, rest
 end
 
-local function LullabyTap()
-    if IsOnPC and AutoLullaby then
-        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Space, false, nil)
-        task.wait()
-        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Space, false, nil)
-    end
-end
-
 local function guiClick(btn)
     if btn and not btn:IsA('GuiButton') then
         btn = asClickable(btn)
@@ -431,30 +415,6 @@ local function normModKey(str)
         return ''
     end
     return (str:gsub('%s+', '')):lower()
-end
-
-local function getSpaceBind()
-    if not Keybinds then
-        return nil
-    end
-    return Keybinds:FindFirstChild('Space')
-end
-
-local function setSpaceBind(value)
-    local spaceValue = getSpaceBind()
-    if not spaceValue then
-        return
-    end
-    if resolveKeyName(spaceValue.Value) == value then
-        return
-    end
-    LullabyRebinding = true
-    RE:FireServer('REMOTE_EVENT', {
-        buffer.fromstring('"Input"'),
-        buffer.fromstring(string.format('"%s"', tostring(value))),
-        buffer.fromstring('"Space"'),
-    })
-    LullabyRebinding = false
 end
 
 local function asClickable(node)
@@ -706,8 +666,35 @@ local function playNoteSequence(Holder, Arrow, keyCode, AutoCtx)
     end)
 end
 
+local function purgeLullaby(engine)
+    if not engine then
+        return
+    end
+    task.wait(5)
+    local bg = engine:FindFirstChild('background')
+    if bg and bg:IsA('Frame') then
+        bg:Destroy()
+    end
+    for _, d in ipairs(engine:GetChildren()) do
+        if d.Name == 'static' and d:IsA('Sound') then
+            d:Destroy()
+        end
+    end
+    connections:add(engine.ChildAdded, function(c)
+        if c.Name == 'background' and c:IsA('Frame') then
+            c:Destroy()
+        elseif c.Name == 'static' and c:IsA('Sound') then
+            c:Destroy()
+        end
+    end)
+    connections:add(engine.ChildAdded, function(d)
+        if d.Name == 'static' and d:IsA('Sound') then
+            d:Destroy()
+        end
+    end)
+end
+
 local MainControls = TabMain:AddLeftGroupbox('Autoplayer')
-local InputTypeGroup = TabMain:AddLeftGroupbox('Input Type')
 local MiscControls = TabMain:AddRightGroupbox('Options')
 local AutoModsGroup = TabMain:AddRightGroupbox('Auto Modifiers')
 
@@ -746,12 +733,16 @@ local function watchSolo(enabled)
     end
     watchers.solo = PlayerGui.ChildAdded:Connect(function(child)
         if child and child.Name == 'SingleplayerUI' then
-            doSolo(child)
+            task.defer(function()
+                doSolo(child)
+            end)
         end
     end)
     local existing = PlayerGui:FindFirstChild('SingleplayerUI')
     if existing then
-        doSolo(existing)
+        task.defer(function()
+            doSolo(existing)
+        end)
     end
 end
 
@@ -1011,24 +1002,6 @@ if IsOnMobile then
     })
 end
 
-if not IsOnMobile then
-    MiscControls:AddToggle('AutoLullaby', {
-        Text = 'Auto Lullaby',
-        Default = false,
-        Callback = function(v)
-            AutoLullaby = v and true or false
-            local eng = PlayerGui:FindFirstChild('FNFEngine')
-            if eng then
-                if AutoLullaby then
-                    setupLullaby(eng)
-                else
-                    resetLullaby()
-                end
-            end
-        end,
-    })
-end
-
 MiscControls:AddButton('Instant Solo', {
     Text = 'Instant Solo',
     Func = function()
@@ -1071,23 +1044,6 @@ if actorsAPI then
         end,
     })
 end
-
-InputTypeGroup:AddLabel({
-    Text = 'For mobile emulators: choose how input is sent (button press vs key press).',
-    DoesWrap = true,
-})
-
-inputModeDropdown = InputTypeGroup:AddDropdown('InputMode', {
-    Text = 'Input mode',
-    Values = { 'Button', 'Key' },
-    Default = imode,
-    Callback = function(opt)
-        local sel = (typeof(opt) == 'table' and opt[1]) or opt
-        if sel == 'Button' or sel == 'Key' then
-            imode = sel
-        end
-    end,
-})
 
 AutoModsGroup:AddLabel('Hard Modifiers')
 AutoModsGroup:AddToggle('AM_Hard_Death', {
@@ -1313,7 +1269,6 @@ scriptGroup:AddButton('Reload script', {
         AutoEnabled = false
         pcall(ReleaseAllActiveLanes)
         detachScrollWatcher()
-        resetLullaby()
         connections:disconnect()
         regGuiListeners()
         scan()
@@ -1382,14 +1337,6 @@ do
             'FNB Autoplayer',
             'One or more requirements are missing; functionality may be limited.'
         )
-    end
-end
-
-do
-    local opts = Obsidian.Options
-    local opt = opts and opts.InputMode
-    if opt and opt.SetValue then
-        opt:SetValue(imode)
     end
 end
 
@@ -1528,177 +1475,13 @@ local function scan()
     rpc(det, st, picon(), pname(), sid, sh)
 end
 
-local function hookPend(pend)
-    if not pend or not pend:IsA('ImageLabel') then
-        return
-    end
-    if LullabyConnPend then
-        LullabyConnPend:Disconnect()
-        LullabyConnPend = nil
-    end
-    LullabyBeatArmed = false
-    LullabySpamToken += 1
-    local function stopSpam()
-        if LullabyBeatArmed then
-            LullabyBeatArmed = false
-            LullabySpamToken += 1
-        end
-    end
-    local function startSpam()
-        if LullabyBeatArmed then
-            return
-        end
-        LullabyBeatArmed = true
-        LullabySpamToken += 1
-        local token = LullabySpamToken
-        task.spawn(function()
-            while
-                AutoLullaby
-                and LullabyBeatArmed
-                and token == LullabySpamToken
-            do
-                local rotation = tonumber(pend.Rotation) or 0
-                if rotation < -7 or rotation > 7 then
-                    break
-                end
-                LullabyTap()
-                if LullabySpamInterval and LullabySpamInterval > 0 then
-                    task.wait(LullabySpamInterval)
-                else
-                    task.wait()
-                end
-            end
-            if token == LullabySpamToken then
-                LullabyBeatArmed = false
-            end
-        end)
-    end
-    local function evaluate()
-        local r = tonumber(pend.Rotation) or 0
-        if r >= -10 and r <= 10 then
-            startSpam()
-        else
-            stopSpam()
-        end
-    end
-    LullabyConnPend = pend:GetPropertyChangedSignal('Rotation')
-        :Connect(function()
-            if not AutoLullaby then
-                return
-            end
-            evaluate()
-        end)
-    evaluate()
-end
-
-function setupLullaby(eng)
-    if not AutoLullaby or IsOnMobile then
-        return
-    end
-    if LullabyConnKey then
-        LullabyConnKey:Disconnect()
-        LullabyConnKey = nil
-    end
-    if LullabyConnBG then
-        LullabyConnBG:Disconnect()
-        LullabyConnBG = nil
-    end
-    if LullabyConnPend then
-        LullabyConnPend:Disconnect()
-        LullabyConnPend = nil
-    end
-    LullabyBeatArmed = false
-    LullabySpamToken += 1
-    local spaceBind = getSpaceBind()
-    local current = resolveKeyName(spaceBind and spaceBind.Value or 'Space')
-    if not OriginalSpaceBind then
-        OriginalSpaceBind = current
-    end
-    local function forceButtonABind()
-        local bindObj = getSpaceBind()
-        local now = resolveKeyName(bindObj and bindObj.Value or 'Space')
-        if now == 'ButtonA' then
-            return
-        end
-        RE:FireServer('REMOTE_EVENT', {
-            buffer.fromstring('"Input"'),
-            buffer.fromstring('"ButtonA"'),
-            buffer.fromstring('"Space"'),
-        })
-        LullabyChanged = true
-        setSpaceBind('ButtonA')
-    end
-    forceButtonABind()
-    LullabyConnKey = spaceBind
-        and spaceBind:GetPropertyChangedSignal('Value'):Connect(function()
-            if not AutoLullaby or LullabyRebinding then
-                return
-            end
-            forceButtonABind()
-        end)
-    local engine = eng:FindFirstChild('Engine')
-    if not engine then
-        return
-    end
-    local bg = engine:FindFirstChild('background')
-    if bg and bg:IsA('Frame') then
-        local pend = bg:FindFirstChild('pendelum')
-        if pend then
-            hookPend(pend)
-        end
-    end
-    LullabyConnBG = engine.ChildAdded:Connect(function(c)
-        if c.Name == 'background' and c:IsA('Frame') then
-            local pend = c:FindFirstChild('pendelum')
-            if pend then
-                hookPend(pend)
-            end
-            if not pend then
-                c.ChildAdded:Connect(function(gc)
-                    if gc.Name == 'pendelum' then
-                        hookPend(gc)
-                    end
-                end)
-            end
-        end
-    end)
-end
-
-local function resetLullaby()
-    if LullabyConnKey then
-        LullabyConnKey:Disconnect()
-        LullabyConnKey = nil
-    end
-    if LullabyConnBG then
-        LullabyConnBG:Disconnect()
-        LullabyConnBG = nil
-    end
-    if LullabyConnPend then
-        LullabyConnPend:Disconnect()
-        LullabyConnPend = nil
-    end
-    LullabyBeatArmed = false
-    if LullabyChanged then
-        RE:FireServer('REMOTE_EVENT', {
-            buffer.fromstring('"Input"'),
-            buffer.fromstring('"Space"'),
-            buffer.fromstring('"Space"'),
-        })
-    end
-    if OriginalSpaceBind then
-        setSpaceBind(OriginalSpaceBind)
-    else
-        setSpaceBind('Space')
-    end
-    LullabyChanged = false
-    OriginalSpaceBind = nil
-end
-
 onChildAdded = function(Object)
     if not Object or Object.Name ~= 'FNFEngine' then
         scan()
         return
     end
+    local Engine = Object.Engine
+    purgeLullaby(Engine)
     local function IsOnHit(m)
         return (m ~= nil and require(m).Type == 'OnHit')
     end
@@ -1749,8 +1532,13 @@ onChildAdded = function(Object)
     if IsOnMobile then
         local mb = Object.Engine:FindFirstChild('MobileButtons')
         local cont = mb and mb:FindFirstChild('Container')
-        if cont and HideMobileBtns then
-            cont.Visible = false
+        if count and cont.Visible then
+            if HideMobileBtns then
+                cont.Visible = false
+            end
+            imode='Button'
+        else
+            imode='Key'
         end
     end
     local MobileButtons = Object.Engine:FindFirstChild('MobileButtons')
@@ -1868,9 +1656,6 @@ end
 regGuiListeners = function()
     connections:add(PlayerGui.ChildAdded, function(o)
         if o and o.Name == 'FNFEngine' then
-            if AutoLullaby and not IsOnMobile then
-                setupLullaby(o)
-            end
             applyMods(true)
         end
         if o and o.Name == 'GameUI' then
@@ -1887,7 +1672,6 @@ regGuiListeners = function()
     end)
     connections:add(PlayerGui.ChildRemoved, function(o)
         if o and o.Name == 'FNFEngine' then
-            task.spawn(resetLullaby)
             scan()
         end
         if o and o.Name == 'GameUI' then
@@ -1908,12 +1692,10 @@ regGuiListeners = function()
 
     local existingEngine = PlayerGui:FindFirstChild('FNFEngine')
     if existingEngine then
-        if AutoLullaby and not IsOnMobile then
-            setupLullaby(existingEngine)
-        end
         applyMods(true)
         local engine = existingEngine:FindFirstChild('Engine')
         if engine then
+            purgeLullaby(engine)
             local td = engine:FindFirstChild('TakeDamage')
             if td then
                 TakeDamageRemote = td
