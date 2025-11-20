@@ -265,6 +265,15 @@ local Mode = 'normal'
 local AntiMissEnabled = false
 local imode = 'Key'
 
+local function updateInputMode(lastInputType)
+    local name = lastInputType and lastInputType.Name or ''
+    if name == 'Touch' then
+        imode = 'Button'
+    else
+        imode = 'Key'
+    end
+end
+
 local function resolveKeyName(value)
     if value == nil then
         return 'Space'
@@ -1532,13 +1541,8 @@ onChildAdded = function(Object)
     if IsOnMobile then
         local mb = Object.Engine:FindFirstChild('MobileButtons')
         local cont = mb and mb:FindFirstChild('Container')
-        if count and ((count:FindFirstChildOfClass("ImageButton") and count:FindFirstChildOfClass("ImageButton").Visible) or (count:FindFirstChildOfClass("TextButton") and count:FindFirstChildOfClass("TextButton").Visible)) then
-            if HideMobileBtns then
-                cont.Visible = false
-            end
-            imode='Button'
-        else
-            imode='Key'
+        if cont and HideMobileBtns then
+            cont.Visible = false
         end
     end
     local MobileButtons = Object.Engine:FindFirstChild('MobileButtons')
@@ -1714,6 +1718,12 @@ end
 
 regGuiListeners()
 scan()
+
+updateInputMode(UserInputService:GetLastInputType())
+
+connections:add(UserInputService.LastInputTypeChanged, function(t)
+    updateInputMode(t)
+end)
 
 for _, v in pairs(workspace:GetDescendants()) do
     if v.ClassName == 'ProximityPrompt' then
