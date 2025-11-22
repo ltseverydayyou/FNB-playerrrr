@@ -1490,7 +1490,7 @@ onChildAdded = function(Object)
         return
     end
     local Engine = Object.Engine
-    purgeLullaby(Engine)
+    task.spawn(function() purgeLullaby(Engine) end)
     local function IsOnHit(m)
         return (m ~= nil and require(m).Type == 'OnHit')
     end
@@ -1699,7 +1699,7 @@ regGuiListeners = function()
         applyMods(true)
         local engine = existingEngine:FindFirstChild('Engine')
         if engine then
-            purgeLullaby(engine)
+            task.spawn(function() purgeLullaby(engine) end)
             local td = engine:FindFirstChild('TakeDamage')
             if td then
                 TakeDamageRemote = td
