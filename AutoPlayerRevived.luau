@@ -12,7 +12,7 @@ local connections = {
     end,
     disconnect = function(self)
         for _, v in pairs(self._list) do
-            if type(v) == 'userdata' and v.Connected then
+            if type(v) == "userdata" and v.Connected then
                 v:Disconnect()
             end
         end
@@ -32,68 +32,69 @@ local spLimit = 15
 local SplashIndex = math.random(1, spLimit)
 local SplashText
 if SplashIndex == 1 then
-    SplashText = 'hi guys hows doin there'
+    SplashText = "hi guys hows doin there"
 end
 if SplashIndex == 2 then
     SplashText =
-        'Did u know that that in terms of male human and female pokemon breeding...'
+        "Did u know that that in terms of male human and female pokemon breeding..."
 end
 if SplashIndex == 3 then
     SplashText =
-        'They took everything from me: my voice, my freedom, my legacy; and they replaced me with some blue haired kid'
+        "They took everything from me: my voice, my freedom, my legacy; and they replaced me with some blue haired kid"
 end
 if SplashIndex == 4 then
-    SplashText = 'amogus ඞ'
+    SplashText = "amogus ඞ"
 end
 if SplashIndex == 5 then
-    SplashText = 'swish i fixed the autoplayer for u :)'
+    SplashText = "swish i fixed the autoplayer for u :)"
 end
 if SplashIndex == 6 then
-    SplashText = 'nah my man fq0e, kill urself instead u gigantic faggot'
+    SplashText = "nah my man fq0e, kill urself instead u gigantic faggot"
 end
 if SplashIndex == 7 then
     SplashText =
-        'Friday Night Funkin’: Vs. MX/Mario 85 - Game Over (ft. Kiwiquest) (+ FLP)'
+        "Friday Night Funkin’: Vs. MX/Mario 85 - Game Over (ft. Kiwiquest) (+ FLP)"
 end
 if SplashIndex == 8 then
-    SplashText = 'you will to be silenced'
+    SplashText = "you will to be silenced"
 end
 if SplashIndex == 9 then
-    SplashText = 'Are u winning, son?'
+    SplashText = "Are u winning, son?"
 end
 if SplashIndex == 10 then
     SplashText =
-        'Now █████████████████-proof!'
+        "Now █████████████████-proof!"
 end
 if SplashIndex == 11 then
-    SplashText = 'Testificate: Family guy edition!'
+    SplashText = "Testificate: Family guy edition!"
 end
 if SplashIndex == 12 then
     SplashText = "The cakes aren't lies here!"
 end
 if SplashIndex == 13 then
-    SplashText = 'Made by professional shitters! :)'
+    SplashText = "Made by professional shitters! :)"
 end
 if SplashIndex == 14 then
-    SplashText = 'me when no rewrite'
+    SplashText = "me when no rewrite"
 end
 if SplashIndex == 15 then
-    SplashText = 'officilly bypassed lmao'
+    SplashText = "officilly bypassed lmao"
 end
 
-local Client = game:GetService('Players').LocalPlayer
+local Client = game:GetService("Players").LocalPlayer
 local PlayerGui = Client.PlayerGui
-local UserInputService = game:GetService('UserInputService')
-local VirtualInputManager = game:GetService('VirtualInputManager')
-local HttpService = game:GetService('HttpService')
-local MarketplaceService = game:GetService('MarketplaceService')
-local ReplicatedStorage = game:GetService('ReplicatedStorage')
-local RE = ReplicatedStorage:WaitForChild('Modules')
-    :WaitForChild('Network')
-    :WaitForChild('RE')
-local RF = ReplicatedStorage:WaitForChild('Modules')
-    :WaitForChild('Network')
-    :WaitForChild('RF')
+local UserInputService = game:GetService("UserInputService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local HttpService = game:GetService("HttpService")
+local MarketplaceService = game:GetService("MarketplaceService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local RE = ReplicatedStorage:WaitForChild("Modules")
+    :WaitForChild("Network")
+    :WaitForChild("RE")
+local RF = ReplicatedStorage:WaitForChild("Modules")
+    :WaitForChild("Network")
+    :WaitForChild("RF")
 
 local TakeDamageRemote
 
@@ -136,59 +137,59 @@ local IsOnPC = (function()
     return false
 end)()
 
-local Input = Client:WaitForChild('Input')
+local Input = Client:WaitForChild("Input")
 local Keybinds = Input.Keybinds
 
 loadstring(
     game:HttpGet(
-        'https://raw.githubusercontent.com/ltseverydayyou/FNB-playerrrr/refs/heads/main/uselessAhh.luau'
+        "https://raw.githubusercontent.com/ltseverydayyou/FNB-playerrrr/refs/heads/main/uselessAhh.luau"
     )
 )()
 local Offsets = loadstring(
     game:HttpGet(
-        'https://raw.githubusercontent.com/ltseverydayyou/FNB-playerrrr/refs/heads/main/speedManager.lua'
+        "https://raw.githubusercontent.com/ltseverydayyou/FNB-playerrrr/refs/heads/main/speedManager.lua"
     )
 )()
 
 local Keys = {
-    [4] = { Left = 'Left', Down = 'Down', Up = 'Up', Right = 'Right' },
+    [4] = { Left = "Left", Down = "Down", Up = "Up", Right = "Right" },
     [5] = {
-        Left = 'Left',
-        Down = 'Down',
-        Space = 'Space',
-        Up = 'Up',
-        Right = 'Right',
+        Left = "Left",
+        Down = "Down",
+        Space = "Space",
+        Up = "Up",
+        Right = "Right",
     },
-    [6] = { S = 'L3', D = 'L2', F = 'L1', J = 'R1', K = 'R2', L = 'R3' },
+    [6] = { S = "L3", D = "L2", F = "L1", J = "R1", K = "R2", L = "R3" },
     [7] = {
-        S = 'L3',
-        D = 'L2',
-        F = 'L1',
-        Space = 'Space',
-        J = 'R1',
-        K = 'R2',
-        L = 'R3',
+        S = "L3",
+        D = "L2",
+        F = "L1",
+        Space = "Space",
+        J = "R1",
+        K = "R2",
+        L = "R3",
     },
     [8] = {
-        A = 'L4',
-        S = 'L3',
-        D = 'L2',
-        F = 'L1',
-        H = 'R1',
-        J = 'R2',
-        K = 'R3',
-        L = 'R4',
+        A = "L4",
+        S = "L3",
+        D = "L2",
+        F = "L1",
+        H = "R1",
+        J = "R2",
+        K = "R3",
+        L = "R4",
     },
     [9] = {
-        A = 'L4',
-        S = 'L3',
-        D = 'L2',
-        Space = 'Space',
-        F = 'L1',
-        H = 'R1',
-        J = 'R2',
-        K = 'R3',
-        L = 'R4',
+        A = "L4",
+        S = "L3",
+        D = "L2",
+        Space = "Space",
+        F = "L1",
+        H = "R1",
+        J = "R2",
+        K = "R3",
+        L = "R4",
     },
 }
 
@@ -208,51 +209,51 @@ local defSpeed = clampSpeed(
 )
 local curSpeed = defSpeed
 
-local RPCDetailsPrefix = ''
-local RPCStatePrefix = ''
-local RPCSidePrefix = 'Side: '
+local RPCDetailsPrefix = ""
+local RPCStatePrefix = ""
+local RPCSidePrefix = "Side: "
 
 local Obsidian = loadstring(
     game:HttpGet(
-        'https://raw.githubusercontent.com/deividcomsono/Obsidian/refs/heads/main/Library.lua'
+        "https://raw.githubusercontent.com/deividcomsono/Obsidian/refs/heads/main/Library.lua"
     )
 )()
 local Window = Obsidian:CreateWindow({
-    Title = 'FNB Autoplayer',
+    Title = "FNB Autoplayer",
     Footer = string.format(
         "Friday Night Bloxxin' Autoplayer REVIVED | %s",
-        tostring(SplashText or '')
+        tostring(SplashText or "")
     ),
     Center = true,
     AutoShow = true,
     ShowCustomCursor = not IsOnMobile,
-    NotifySide = 'Right',
+    NotifySide = "Right",
 })
 
 local function notify(title, description, time)
     Obsidian:Notify({
-        Title = tostring(title or 'FNB'),
-        Description = tostring(description or ''),
+        Title = tostring(title or "FNB"),
+        Description = tostring(description or ""),
         Time = time or 5,
     })
 end
 
 local function asset(id)
-    return string.format('rbxassetid://%d', id)
+    return string.format("rbxassetid://%d", id)
 end
 
 local function formatWithPrefix(prefix, text)
-    local prefixText = tostring(prefix or '')
-    local content = tostring(text or '')
-    if prefixText ~= '' then
+    local prefixText = tostring(prefix or "")
+    local content = tostring(text or "")
+    if prefixText ~= "" then
         return prefixText .. content
     end
     return content
 end
 
-local TabMain = Window:AddTab({ Name = 'Main', Icon = 'layout-dashboard' })
-local TabCredits = Window:AddTab({ Name = 'Credits', Icon = 'users' })
-local TabSettings = Window:AddTab({ Name = 'Settings', Icon = 'settings' })
+local TabMain = Window:AddTab({ Name = "Main", Icon = "layout-dashboard" })
+local TabCredits = Window:AddTab({ Name = "Credits", Icon = "users" })
+local TabSettings = Window:AddTab({ Name = "Settings", Icon = "settings" })
 
 local AutoEnabled = true
 local OffsetMs = 0
@@ -261,27 +262,46 @@ local onChildAdded
 local regGuiListeners
 local HideMobileBtns = true
 local BRPCEnabled = true
-local Mode = 'normal'
+local Mode = "normal"
 local AntiMissEnabled = false
-local imode = 'Key'
 
-local function updateInputMode(lastInputType)
-    local name = lastInputType and lastInputType.Name or ''
-    if name == 'Touch' then
-        imode = 'Button'
-    else
-        imode = 'Key'
+local InputMode = "firesignal"
+if typeof(firesignal) ~= "function" then
+    InputMode = "Virtual Input"
+end
+
+local gEnv
+if typeof(getrenv) == "function" then
+    local ok, env = pcall(getrenv)
+    if ok and type(env) == "table" then
+        gEnv = env._G
     end
 end
 
+RunService.RenderStepped:Connect(function()
+    if not gEnv then
+        return
+    end
+    pcall(function()
+        local li = gEnv.LastInput
+        if li then
+            if InputMode == "firesignal" then
+                li.Value = Enum.UserInputType.Touch
+            else
+                li.Value = Enum.UserInputType.Keyboard
+            end
+        end
+    end)
+end)
+
 local function resolveKeyName(value)
     if value == nil then
-        return 'Space'
+        return "Space"
     end
-    if typeof(value) == 'EnumItem' then
+    if typeof(value) == "EnumItem" then
         return value.Name
     end
-    if typeof(value) == 'string' then
+    if typeof(value) == "string" then
         return value
     end
     return tostring(value)
@@ -305,14 +325,14 @@ local AutoModFlags = {
 
 local ModifierList = {
     Hard = {
-        'Death',
-        'FadeIn',
-        'FadeOut',
-        'Pendulum',
-        'Perfect',
-        'SuddenDeath',
+        "Death",
+        "FadeIn",
+        "FadeOut",
+        "Pendulum",
+        "Perfect",
+        "SuddenDeath",
     },
-    Normal = { 'GhostTapping', 'Mirror', 'Random' },
+    Normal = { "GhostTapping", "Mirror", "Random" },
 }
 
 local AppliedModifierState = {}
@@ -341,7 +361,7 @@ local function pname()
         game.PlaceId
     )
     return ok and info and info.Name
-        or game:GetService('MarketplaceService')
+        or game:GetService("MarketplaceService")
             :GetProductInfo(game.PlaceId).Name
 end
 local function picon()
@@ -367,72 +387,85 @@ local function rpc(details, state, largeId, largeHover, smallId, smallHover)
         state = stateText,
         largeImage = largeId and {
             assetId = tonumber(largeId),
-            hoverText = tostring(largeHover or ''),
+            hoverText = tostring(largeHover or ""),
         } or nil,
     }
     if smallId ~= nil then
         data.smallImage = {
             assetId = tonumber(smallId) or 0,
-            hoverText = tostring(smallHover or ''),
+            hoverText = tostring(smallHover or ""),
         }
     end
-    print('[BloxstrapRPC] ' .. HttpService:JSONEncode({
-        command = 'SetRichPresence',
+    print("[BloxstrapRPC] " .. HttpService:JSONEncode({
+        command = "SetRichPresence",
         data = data,
     }))
 end
 
 local function lobbyRPC()
-    rpc(pname(), 'Lobby', picon(), pname(), nil, nil)
+    rpc(pname(), "Lobby", picon(), pname(), nil, nil)
 end
 
 local function parseCredit(txt)
-    local t = txt or ''
-    local ln1 = t:match('^[^\n]+') or ''
-    ln1 = ln1:gsub('%s%(%d+%.?%d*x%)', '')
-    local rest = t:gsub('^[^\n]*\n?', '')
-    rest = rest:gsub('\n?%d+:%d%d%s*$', '')
-    rest = rest:gsub('^%s+', ''):gsub('%s+$', '')
+    local t = txt or ""
+    local ln1 = t:match("^[^\n]+") or ""
+    ln1 = ln1:gsub("%s%(%d+%.?%d*x%)", "")
+    local rest = t:gsub("^[^\n]*\n?", "")
+    rest = rest:gsub("\n?%d+:%d%d%s*$", "")
+    rest = rest:gsub("^%s+", ""):gsub("%s+$", "")
     return ln1, rest
 end
 
 local function scan()
-    local eng = PlayerGui:FindFirstChild('FNFEngine')
+    local eng = PlayerGui:FindFirstChild("FNFEngine")
     if not eng then
         lobbyRPC()
         return
     end
-    local engine = eng:FindFirstChild('Engine')
-    local lower = engine and engine:FindFirstChild('LowerContainer')
-    local credit = lower and lower:FindFirstChild('Credit')
-    local det, st = '', ''
-    if credit and credit:IsA('TextLabel') then
+    local engine = eng:FindFirstChild("Engine")
+    local lower = engine and engine:FindFirstChild("LowerContainer")
+    local credit = lower and lower:FindFirstChild("Credit")
+    local det, st = "", ""
+    if credit and credit:IsA("TextLabel") then
         det, st = parseCredit(credit.Text)
     end
     local sid
-    local mods = engine and engine:FindFirstChild('Modifiers')
-    local ghost = mods and mods:FindFirstChild('GhostTapping')
-    if ghost and ghost:IsA('ImageButton') and type(ghost.Image) == 'string' then
-        local d = ghost.Image:match('%d+')
+    local mods = engine and engine:FindFirstChild("Modifiers")
+    local ghost = mods and mods:FindFirstChild("GhostTapping")
+    if ghost and ghost:IsA("ImageButton") and type(ghost.Image) == "string" then
+        local d = ghost.Image:match("%d+")
         sid = d and tonumber(d) or nil
     end
     local sideVal = engine
-            and engine:FindFirstChild('PlayerSide')
+            and engine:FindFirstChild("PlayerSide")
             and engine.PlayerSide.Value
-        or 'L'
+        or "L"
     local sh =
-        formatWithPrefix(RPCSidePrefix, sideVal == 'L' and 'Left' or 'Right')
+        formatWithPrefix(RPCSidePrefix, sideVal == "L" and "Left" or "Right")
     rpc(det, st, picon(), pname(), sid, sh)
 end
 
 local function guiClick(btn)
-    if btn and not btn:IsA('GuiButton') then
-        btn = asClickable(btn)
+    if btn and not btn:IsA("GuiButton") then
+        btn = (function(node)
+            if not node then
+                return nil
+            end
+            if node:IsA("GuiButton") then
+                return node
+            end
+            for _, child in ipairs(node:GetDescendants()) do
+                if child:IsA("GuiButton") then
+                    return child
+                end
+            end
+            return nil
+        end)(btn)
     end
     if not btn then
         return
     end
-    if typeof(firesignal) == 'function' then
+    if typeof(firesignal) == "function" then
         pcall(firesignal, btn.MouseButton1Down)
         task.wait()
         pcall(firesignal, btn.MouseButton1Click)
@@ -440,7 +473,7 @@ local function guiClick(btn)
         task.wait()
         pcall(firesignal, btn.MouseButton1Up)
     else
-        if btn:IsA('GuiButton') and typeof(btn.Activate) == 'function' then
+        if btn:IsA("GuiButton") and typeof(btn.Activate) == "function" then
             pcall(function()
                 btn:Activate()
             end)
@@ -449,21 +482,21 @@ local function guiClick(btn)
 end
 
 local function normModKey(str)
-    if type(str) ~= 'string' then
-        return ''
+    if type(str) ~= "string" then
+        return ""
     end
-    return (str:gsub('%s+', '')):lower()
+    return (str:gsub("%s+", "")):lower()
 end
 
 local function asClickable(node)
     if not node then
         return nil
     end
-    if node:IsA('GuiButton') then
+    if node:IsA("GuiButton") then
         return node
     end
     for _, child in ipairs(node:GetDescendants()) do
-        if child:IsA('GuiButton') then
+        if child:IsA("GuiButton") then
             return child
         end
     end
@@ -477,7 +510,7 @@ local function findModButton(container, kind, name)
     local targetKey = normModKey(name)
     local buckets = {
         container:FindFirstChild(kind),
-        container:FindFirstChild(kind .. 'Modifiers'),
+        container:FindFirstChild(kind .. "Modifiers"),
         container,
     }
     for _, bucket in ipairs(buckets) do
@@ -493,8 +526,8 @@ local function findModButton(container, kind, name)
                     if btn then
                         return btn
                     end
-                elseif child:IsA('GuiButton') then
-                    local txt = tostring(child.Text or '')
+                elseif child:IsA("GuiButton") then
+                    local txt = tostring(child.Text or "")
                     if normModKey(txt) == targetKey then
                         return child
                     end
@@ -506,22 +539,22 @@ local function findModButton(container, kind, name)
 end
 
 local function getModButton(kind, name)
-    local engineGui = PlayerGui:FindFirstChild('FNFEngine')
-    local engine = engineGui and engineGui:FindFirstChild('Engine')
+    local engineGui = PlayerGui:FindFirstChild("FNFEngine")
+    local engine = engineGui and engineGui:FindFirstChild("Engine")
     local button =
-        findModButton(engine and engine:FindFirstChild('Modifiers'), kind, name)
+        findModButton(engine and engine:FindFirstChild("Modifiers"), kind, name)
     if button then
         return button
     end
-    local gui = PlayerGui:FindFirstChild('GameUI')
-    local ss = gui and gui:FindFirstChild('SongSelect')
-    local mods = ss and ss:FindFirstChild('Modifiers')
-    local act = mods and mods:FindFirstChild('ActualModifiers')
+    local gui = PlayerGui:FindFirstChild("GameUI")
+    local ss = gui and gui:FindFirstChild("SongSelect")
+    local mods = ss and ss:FindFirstChild("Modifiers")
+    local act = mods and mods:FindFirstChild("ActualModifiers")
     return findModButton(act, kind, name)
 end
 
 local function engineReady()
-    return PlayerGui:FindFirstChild('FNFEngine') ~= nil
+    return PlayerGui:FindFirstChild("FNFEngine") ~= nil
 end
 
 local function applyMod(kind, name, shouldEnable, force)
@@ -556,7 +589,7 @@ local function applyMod(kind, name, shouldEnable, force)
 end
 
 local function queueModApply(kind, name, shouldEnable)
-    local key = string.format('%s:%s', tostring(kind), tostring(name))
+    local key = string.format("%s:%s", tostring(kind), tostring(name))
     modToggleTokens[key] = (modToggleTokens[key] or 0) + 1
     local token = modToggleTokens[key]
     task.delay(ModApplyDelay, function()
@@ -596,26 +629,26 @@ local function applyMods(force)
 end
 
 local function computeBaseOffset(scrollSpeed)
-    local key = string.format('%.1f', tonumber(scrollSpeed) or 1)
+    local key = string.format("%.1f", tonumber(scrollSpeed) or 1)
     local ms = Offsets[key]
     if ms == nil then
-        local fallback = Offsets['10.0'] or 0
+        local fallback = Offsets["10.0"] or 0
         ms = fallback
     end
     return (ms / 1000) + 0.4
 end
 
 local function pressLaneMobile(container, name)
-    if typeof(firesignal) ~= 'function' then
+    if typeof(firesignal) ~= "function" then
         return
     end
     if not container then
         return
     end
     local b = container:FindFirstChild(name)
-    if not b and name == 'Space' then
-        b = container:FindFirstChild('SPACE')
-            or container:FindFirstChild('space')
+    if not b and name == "Space" then
+        b = container:FindFirstChild("SPACE")
+            or container:FindFirstChild("space")
     end
     if b then
         pcall(firesignal, b.MouseButton1Down)
@@ -623,16 +656,16 @@ local function pressLaneMobile(container, name)
 end
 
 local function releaseLaneMobile(container, name)
-    if typeof(firesignal) ~= 'function' then
+    if typeof(firesignal) ~= "function" then
         return
     end
     if not container then
         return
     end
     local b = container:FindFirstChild(name)
-    if not b and name == 'Space' then
-        b = container:FindFirstChild('SPACE')
-            or container:FindFirstChild('space')
+    if not b and name == "Space" then
+        b = container:FindFirstChild("SPACE")
+            or container:FindFirstChild("space")
     end
     if b then
         pcall(firesignal, b.MouseButton1Up)
@@ -640,24 +673,24 @@ local function releaseLaneMobile(container, name)
 end
 
 local function actorKey(op, codeName)
-    if Mode ~= 'actor' then
+    if Mode ~= "actor" then
         return false
     end
     local actorsAPI = (
-        typeof(getactors) == 'function' and typeof(run_on_actor) == 'function'
+        typeof(getactors) == "function" and typeof(run_on_actor) == "function"
     )
     if not actorsAPI then
         return false
     end
     local okA, actors = pcall(getactors)
-    if not okA or type(actors) ~= 'table' or not actors[1] then
+    if not okA or type(actors) ~= "table" or not actors[1] then
         return false
     end
     local src = 'local vim=game:GetService("VirtualInputManager");vim:SendKeyEvent('
-        .. (op == 'press' and 'true' or 'false')
+        .. (op == "press" and "true" or "false")
         .. ', Enum.KeyCode['
-        .. string.format('%q', codeName)
-        .. '], false, nil)'
+        .. string.format("%q", codeName)
+        .. "], false, nil)"
     pcall(run_on_actor, actors[1], src)
     return false
 end
@@ -673,8 +706,8 @@ local function playNoteSequence(Holder, Arrow, keyCode, AutoCtx)
             return
         end
         local function isHold(a)
-            local f = a:FindFirstChild('Frame')
-            local b = f and f:FindFirstChild('Bar')
+            local f = a:FindFirstChild("Frame")
+            local b = f and f:FindFirstChild("Bar")
             return (b and b.Size and b.Size.Y and (b.Size.Y.Scale > 0.0))
                 or false
         end
@@ -709,32 +742,32 @@ local function purgeLullaby(engine)
         return
     end
     task.wait(5)
-    local bg = engine:FindFirstChild('background')
-    if bg and bg:IsA('Frame') then
+    local bg = engine:FindFirstChild("background")
+    if bg and bg:IsA("Frame") then
         bg:Destroy()
     end
     for _, d in ipairs(engine:GetChildren()) do
-        if d.Name == 'static' and d:IsA('Sound') then
+        if d.Name == "static" and d:IsA("Sound") then
             d:Destroy()
         end
     end
     connections:add(engine.ChildAdded, function(c)
-        if c.Name == 'background' and c:IsA('Frame') then
+        if c.Name == "background" and c:IsA("Frame") then
             c:Destroy()
-        elseif c.Name == 'static' and c:IsA('Sound') then
+        elseif c.Name == "static" and c:IsA("Sound") then
             c:Destroy()
         end
     end)
     connections:add(engine.ChildAdded, function(d)
-        if d.Name == 'static' and d:IsA('Sound') then
+        if d.Name == "static" and d:IsA("Sound") then
             d:Destroy()
         end
     end)
 end
 
-local MainControls = TabMain:AddLeftGroupbox('Autoplayer')
-local MiscControls = TabMain:AddRightGroupbox('Options')
-local AutoModsGroup = TabMain:AddRightGroupbox('Auto Modifiers')
+local MainControls = TabMain:AddLeftGroupbox("Autoplayer")
+local MiscControls = TabMain:AddRightGroupbox("Options")
+local AutoModsGroup = TabMain:AddRightGroupbox("Auto Modifiers")
 
 local tAuto
 local sSpd
@@ -748,12 +781,12 @@ local antiMissToggle
 local inputModeDropdown
 
 local function doSolo(singleplayerUI)
-    local sp = singleplayerUI or PlayerGui:FindFirstChild('SingleplayerUI')
+    local sp = singleplayerUI or PlayerGui:FindFirstChild("SingleplayerUI")
     if not sp then
         return false
     end
-    local remote = sp:FindFirstChild('ButtonPressed')
-        or sp:WaitForChild('ButtonPressed', 2)
+    local remote = sp:FindFirstChild("ButtonPressed")
+        or sp:WaitForChild("ButtonPressed", 2)
     if not remote then
         return false
     end
@@ -770,13 +803,13 @@ local function watchSolo(enabled)
         return
     end
     watchers.solo = PlayerGui.ChildAdded:Connect(function(child)
-        if child and child.Name == 'SingleplayerUI' then
+        if child and child.Name == "SingleplayerUI" then
             task.defer(function()
                 doSolo(child)
             end)
         end
     end)
-    local existing = PlayerGui:FindFirstChild('SingleplayerUI')
+    local existing = PlayerGui:FindFirstChild("SingleplayerUI")
     if existing then
         task.defer(function()
             doSolo(existing)
@@ -784,8 +817,8 @@ local function watchSolo(enabled)
     end
 end
 
-tAuto = MainControls:AddToggle('AutoplayerToggle', {
-    Text = 'Autoplayer',
+tAuto = MainControls:AddToggle("AutoplayerToggle", {
+    Text = "Autoplayer",
     Default = true,
     Callback = function(v)
         AutoEnabled = v
@@ -796,25 +829,25 @@ tAuto = MainControls:AddToggle('AutoplayerToggle', {
 })
 
 if not IsOnMobile then
-    local KeybindGroup = TabMain:AddLeftGroupbox('Keybinds')
+    local KeybindGroup = TabMain:AddLeftGroupbox("Keybinds")
     local function createKeybind(labelText, idx, defaultKey, callback)
         local label = KeybindGroup:AddLabel(labelText)
         label:AddKeyPicker(idx, {
             Text = labelText,
             Default = defaultKey,
-            Mode = 'Press',
+            Mode = "Press",
             Callback = function()
                 callback()
             end,
         })
     end
-    createKeybind('Autoplayer toggle', 'AutoToggleKey', 'End', function()
+    createKeybind("Autoplayer toggle", "AutoToggleKey", "End", function()
         tAuto:SetValue(not tAuto.Value)
     end)
-    createKeybind('Reset', 'ResetKey', 'PageUp', function()
+    createKeybind("Reset", "ResetKey", "PageUp", function()
         Client.Character:BreakJoints()
     end)
-    createKeybind('Instant Solo', 'SoloKey', 'PageDown', function()
+    createKeybind("Instant Solo", "SoloKey", "PageDown", function()
         doSolo()
     end)
 end
@@ -822,7 +855,7 @@ end
 local scrollSpeedUpdating = false
 
 local function pushSpeed(value)
-    RE:FireServer('REMOTE_EVENT', {
+    RE:FireServer("REMOTE_EVENT", {
         buffer.fromstring('"Input"'),
         buffer.fromstring(tostring(value)),
         buffer.fromstring('"ScrollSpeed"'),
@@ -841,10 +874,10 @@ local function syncSlider(value)
 end
 
 local function parseScrollSpeedText(text)
-    if type(text) ~= 'string' then
+    if type(text) ~= "string" then
         return nil
     end
-    local match = string.match(text, '[-+]?%d+%.?%d*')
+    local match = string.match(text, "[-+]?%d+%.?%d*")
     if not match then
         return nil
     end
@@ -880,36 +913,36 @@ end
 local function attachScrollWatcher()
     detachScrollWatcher()
     task.spawn(function()
-        local gui = PlayerGui:FindFirstChild('GameUI')
-            or PlayerGui:WaitForChild('GameUI', 5)
+        local gui = PlayerGui:FindFirstChild("GameUI")
+            or PlayerGui:WaitForChild("GameUI", 5)
         if not gui then
             return
         end
-        local settings = gui:FindFirstChild('Settings')
-            or gui:WaitForChild('Settings', 5)
+        local settings = gui:FindFirstChild("Settings")
+            or gui:WaitForChild("Settings", 5)
         if not settings then
             return
         end
-        local options = settings:FindFirstChild('Options')
-            or settings:WaitForChild('Options', 5)
+        local options = settings:FindFirstChild("Options")
+            or settings:WaitForChild("Options", 5)
         if not options then
             return
         end
-        local scrollNode = options:FindFirstChild('ScrollSpeed')
-            or options:WaitForChild('ScrollSpeed', 5)
+        local scrollNode = options:FindFirstChild("ScrollSpeed")
+            or options:WaitForChild("ScrollSpeed", 5)
         if not scrollNode then
             return
         end
-        local button = scrollNode:FindFirstChild('Button')
-            or scrollNode:WaitForChild('Button', 5)
-        if not button or not button:IsA('TextButton') then
+        local button = scrollNode:FindFirstChild("Button")
+            or scrollNode:WaitForChild("Button", 5)
+        if not button or not button:IsA("TextButton") then
             return
         end
         local function onTextChanged()
             syncSliderWithScrollSpeedButton(button)
         end
         watchers.scrollBtn =
-            button:GetPropertyChangedSignal('Text'):Connect(onTextChanged)
+            button:GetPropertyChangedSignal("Text"):Connect(onTextChanged)
         watchers.scrollAnces = button.AncestryChanged:Connect(
             function(_, parent)
                 if not parent then
@@ -941,7 +974,7 @@ local function bindSongVis(songSelect)
         watchers.songVis = nil
     end
     watchers.songVis = songSelect
-        :GetPropertyChangedSignal('Visible')
+        :GetPropertyChangedSignal("Visible")
         :Connect(function()
             if songSelect.Visible then
                 applyMods(true)
@@ -958,21 +991,21 @@ local function watchSongSel(gameUI)
         return
     end
     local function onChildAdded(child)
-        if child and child.Name == 'SongSelect' then
+        if child and child.Name == "SongSelect" then
             bindSongVis(child)
         end
     end
     watchers.songChild = gameUI.ChildAdded:Connect(onChildAdded)
-    onChildAdded(gameUI:FindFirstChild('SongSelect'))
+    onChildAdded(gameUI:FindFirstChild("SongSelect"))
 end
 
-sSpd = MainControls:AddSlider('ScrollSpeed', {
-    Text = 'Scroll Speed',
+sSpd = MainControls:AddSlider("ScrollSpeed", {
+    Text = "Scroll Speed",
     Default = defSpeed,
     Min = 0.5,
     Max = 200,
     Rounding = 1,
-    Suffix = 'x',
+    Suffix = "x",
     Callback = function(v)
         if scrollSpeedUpdating then
             return
@@ -983,9 +1016,9 @@ sSpd = MainControls:AddSlider('ScrollSpeed', {
     end,
 })
 
-MainControls:AddInput('ScrollSpeedInput', {
-    Text = 'Speed override',
-    Placeholder = '0.5 - 200.0',
+MainControls:AddInput("ScrollSpeedInput", {
+    Text = "Speed override",
+    Placeholder = "0.5 - 200.0",
     Finished = true,
     Numeric = true,
     ClearTextOnFocus = false,
@@ -995,22 +1028,22 @@ MainControls:AddInput('ScrollSpeedInput', {
     end,
 })
 
-sMs = MainControls:AddSlider('HitOffset', {
-    Text = 'Hit offset',
+sMs = MainControls:AddSlider("HitOffset", {
+    Text = "Hit offset",
     Default = 0,
     Min = -500,
     Max = 500,
     Rounding = 1,
-    Suffix = 'ms',
+    Suffix = "ms",
     Callback = function(v)
         local value = math.clamp(tonumber(v) or 0, -500, 500)
         OffsetMs = value
     end,
 })
 
-MainControls:AddInput('HitOffsetInput', {
-    Text = 'Offset override',
-    Placeholder = '-500 - 500',
+MainControls:AddInput("HitOffsetInput", {
+    Text = "Offset override",
+    Placeholder = "-500 - 500",
     Finished = true,
     Numeric = true,
     ClearTextOnFocus = false,
@@ -1021,45 +1054,61 @@ MainControls:AddInput('HitOffsetInput', {
     end,
 })
 
-if IsOnMobile then
-    hideMobileToggle = MiscControls:AddToggle('HideMobileButtons', {
-        Text = 'Hide Mobile Buttons',
-        Default = true,
-        Callback = function(v)
-            HideMobileBtns = v
-            local eng = PlayerGui:FindFirstChild('FNFEngine')
-            if not eng then
-                return
+inputModeDropdown = MainControls:AddDropdown("InputMode", {
+    Text = "Input method",
+    Values = { "Virtual Input", "firesignal" },
+    Default = InputMode,
+    Callback = function(opt)
+        local sel = (typeof(opt) == "table" and opt[1]) or opt or "Virtual Input"
+        if sel == "firesignal" and typeof(firesignal) ~= "function" then
+            notify("Missing requirement", "firesignal is required for firesignal mode; using Virtual Input instead.", 6)
+            InputMode = "Virtual Input"
+            if inputModeDropdown then
+                inputModeDropdown:SetValue("Virtual Input")
             end
-            local mb = eng.Engine:FindFirstChild('MobileButtons')
-            local cont = mb and mb:FindFirstChild('Container')
-            if cont then
-                cont.Visible = not v
-            end
-        end,
-    })
-end
+            return
+        end
+        InputMode = sel
+    end,
+})
 
-MiscControls:AddButton('Instant Solo', {
-    Text = 'Instant Solo',
+hideMobileToggle = MiscControls:AddToggle("HideMobileButtons", {
+    Text = "Hide Mobile Buttons",
+    Default = true,
+    Callback = function(v)
+        HideMobileBtns = v
+        local eng = PlayerGui:FindFirstChild("FNFEngine")
+        if not eng then
+            return
+        end
+        local mb = eng.Engine:FindFirstChild("MobileButtons")
+        local cont = mb and mb:FindFirstChild("Container")
+        if cont then
+            cont.Visible = not v
+        end
+    end,
+})
+
+MiscControls:AddButton("Instant Solo", {
+    Text = "Instant Solo",
     Func = function()
-        local sp = PlayerGui:WaitForChild('SingleplayerUI', 2)
+        local sp = PlayerGui:WaitForChild("SingleplayerUI", 2)
         if sp then
             doSolo(sp)
         end
     end,
 })
 
-soloToggle = MiscControls:AddToggle('AutoSolo', {
-    Text = 'Auto Solo',
+soloToggle = MiscControls:AddToggle("AutoSolo", {
+    Text = "Auto Solo",
     Default = false,
     Callback = function(v)
         watchSolo(v)
     end,
 })
 
-antiMissToggle = MiscControls:AddToggle('AntiMiss', {
-    Text = 'Anti Miss',
+antiMissToggle = MiscControls:AddToggle("AntiMiss", {
+    Text = "Anti Miss",
     Default = AntiMissEnabled,
     Callback = function(v)
         AntiMissEnabled = v and true or false
@@ -1067,132 +1116,132 @@ antiMissToggle = MiscControls:AddToggle('AntiMiss', {
 })
 
 local actorsAPI = (
-    typeof(getactors) == 'function' and typeof(run_on_actor) == 'function'
+    typeof(getactors) == "function" and typeof(run_on_actor) == "function"
 )
 if actorsAPI then
-    modeDropdown = MiscControls:AddDropdown('AutoplayerMode', {
-        Text = 'Autoplayer Mode',
-        Values = { 'normal', 'actor' },
+    modeDropdown = MiscControls:AddDropdown("AutoplayerMode", {
+        Text = "Autoplayer Mode",
+        Values = { "normal", "actor" },
         Default = Mode,
         Callback = function(opt)
-            local sel = (typeof(opt) == 'table' and opt[1]) or opt or Mode
-            if sel == 'actor' or sel == 'normal' then
+            local sel = (typeof(opt) == "table" and opt[1]) or opt or Mode
+            if sel == "actor" or sel == "normal" then
                 Mode = sel
             end
         end,
     })
 end
 
-AutoModsGroup:AddLabel('Hard Modifiers')
-AutoModsGroup:AddToggle('AM_Hard_Death', {
-    Text = 'Death',
+AutoModsGroup:AddLabel("Hard Modifiers")
+AutoModsGroup:AddToggle("AM_Hard_Death", {
+    Text = "Death",
     Default = false,
     Callback = function(v)
         AutoModFlags.Hard.Death = v
-        queueModApply('Hard', 'Death', v)
+        queueModApply("Hard", "Death", v)
     end,
 })
-AutoModsGroup:AddToggle('AM_Hard_FadeIn', {
-    Text = 'FadeIn',
+AutoModsGroup:AddToggle("AM_Hard_FadeIn", {
+    Text = "FadeIn",
     Default = false,
     Callback = function(v)
         AutoModFlags.Hard.FadeIn = v
-        queueModApply('Hard', 'FadeIn', v)
+        queueModApply("Hard", "FadeIn", v)
     end,
 })
-AutoModsGroup:AddToggle('AM_Hard_FadeOut', {
-    Text = 'FadeOut',
+AutoModsGroup:AddToggle("AM_Hard_FadeOut", {
+    Text = "FadeOut",
     Default = false,
     Callback = function(v)
         AutoModFlags.Hard.FadeOut = v
-        queueModApply('Hard', 'FadeOut', v)
+        queueModApply("Hard", "FadeOut", v)
     end,
 })
-AutoModsGroup:AddToggle('AM_Hard_Pendulum', {
-    Text = 'Pendulum',
+AutoModsGroup:AddToggle("AM_Hard_Pendulum", {
+    Text = "Pendulum",
     Default = false,
     Callback = function(v)
         AutoModFlags.Hard.Pendulum = v
-        queueModApply('Hard', 'Pendulum', v)
+        queueModApply("Hard", "Pendulum", v)
     end,
 })
-AutoModsGroup:AddToggle('AM_Hard_Perfect', {
-    Text = 'Perfect',
+AutoModsGroup:AddToggle("AM_Hard_Perfect", {
+    Text = "Perfect",
     Default = false,
     Callback = function(v)
         AutoModFlags.Hard.Perfect = v
-        queueModApply('Hard', 'Perfect', v)
+        queueModApply("Hard", "Perfect", v)
     end,
 })
-AutoModsGroup:AddToggle('AM_Hard_SuddenDeath', {
-    Text = 'SuddenDeath',
+AutoModsGroup:AddToggle("AM_Hard_SuddenDeath", {
+    Text = "SuddenDeath",
     Default = false,
     Callback = function(v)
         AutoModFlags.Hard.SuddenDeath = v
-        queueModApply('Hard', 'SuddenDeath', v)
+        queueModApply("Hard", "SuddenDeath", v)
     end,
 })
 
 AutoModsGroup:AddDivider()
-AutoModsGroup:AddLabel('Normal Modifiers')
-AutoModsGroup:AddToggle('AM_Normal_GhostTapping', {
-    Text = 'GhostTapping',
+AutoModsGroup:AddLabel("Normal Modifiers")
+AutoModsGroup:AddToggle("AM_Normal_GhostTapping", {
+    Text = "GhostTapping",
     Default = false,
     Callback = function(v)
         AutoModFlags.Normal.GhostTapping = v
-        queueModApply('Normal', 'GhostTapping', v)
+        queueModApply("Normal", "GhostTapping", v)
     end,
 })
-AutoModsGroup:AddToggle('AM_Normal_Mirror', {
-    Text = 'Mirror',
+AutoModsGroup:AddToggle("AM_Normal_Mirror", {
+    Text = "Mirror",
     Default = false,
     Callback = function(v)
         AutoModFlags.Normal.Mirror = v
-        queueModApply('Normal', 'Mirror', v)
+        queueModApply("Normal", "Mirror", v)
     end,
 })
-AutoModsGroup:AddToggle('AM_Normal_Random', {
-    Text = 'Random',
+AutoModsGroup:AddToggle("AM_Normal_Random", {
+    Text = "Random",
     Default = false,
     Callback = function(v)
         AutoModFlags.Normal.Random = v
-        queueModApply('Normal', 'Random', v)
+        queueModApply("Normal", "Random", v)
     end,
 })
 
-local creditsGroup = TabCredits:AddLeftGroupbox('Credits')
+local creditsGroup = TabCredits:AddLeftGroupbox("Credits")
 
-if typeof(setclipboard) == 'function' then
-    creditsGroup:AddButton('FixerLink', {
-        Text = 'Fixed by ltseverydayyou',
+if typeof(setclipboard) == "function" then
+    creditsGroup:AddButton("FixerLink", {
+        Text = "Fixed by ltseverydayyou",
         Func = function()
-            setclipboard('https://github.com/ltseverydayyou')
-            notify('Copied', 'GitHub URL copied to clipboard', 3)
+            setclipboard("https://github.com/ltseverydayyou")
+            notify("Copied", "GitHub URL copied to clipboard", 3)
         end,
     })
-    creditsGroup:AddButton('OriginalLink', {
-        Text = 'Original by Mati278',
+    creditsGroup:AddButton("OriginalLink", {
+        Text = "Original by Mati278",
         Func = function()
-            setclipboard('https://github.com/Mati278')
-            notify('Copied', 'GitHub URL copied to clipboard', 3)
+            setclipboard("https://github.com/Mati278")
+            notify("Copied", "GitHub URL copied to clipboard", 3)
         end,
     })
 else
     creditsGroup:AddLabel({
-        Text = 'Fixed by ltseverydayyou\nhttps://github.com/ltseverydayyou',
+        Text = "Fixed by ltseverydayyou\nhttps://github.com/ltseverydayyou",
         DoesWrap = true,
     })
     creditsGroup:AddLabel({
-        Text = 'Original by Mati278\nhttps://github.com/Mati278',
+        Text = "Original by Mati278\nhttps://github.com/Mati278",
         DoesWrap = true,
     })
 end
 
-creditsGroup:AddLabel('Anticheat bypass by ltseverydayyou')
+creditsGroup:AddLabel("Anticheat bypass by ltseverydayyou")
 
-local uiSettings = TabSettings:AddLeftGroupbox('UI Settings')
-cursorToggle = uiSettings:AddToggle('ObsidianCursor', {
-    Text = 'Show Obsidian cursor',
+local uiSettings = TabSettings:AddLeftGroupbox("UI Settings")
+cursorToggle = uiSettings:AddToggle("ObsidianCursor", {
+    Text = "Show Obsidian cursor",
     Default = Obsidian.ShowCustomCursor ~= false,
     Callback = function(v)
         Obsidian.ShowCustomCursor = v
@@ -1203,55 +1252,55 @@ cursorToggle = uiSettings:AddToggle('ObsidianCursor', {
     end,
 })
 
-uiSettings:AddToggle('NotifyOnErrorToggle', {
-    Text = 'Notify on callback errors',
+uiSettings:AddToggle("NotifyOnErrorToggle", {
+    Text = "Notify on callback errors",
     Default = Obsidian.NotifyOnError,
     Callback = function(v)
         Obsidian.NotifyOnError = v
     end,
 })
 
-uiSettings:AddToggle('LockDraggingToggle', {
-    Text = 'Lock window dragging',
+uiSettings:AddToggle("LockDraggingToggle", {
+    Text = "Lock window dragging",
     Default = Obsidian.CantDragForced,
     Callback = function(v)
         Obsidian.CantDragForced = v
     end,
 })
 
-local currentNotifySide = Obsidian.NotifySide or 'Right'
-if type(currentNotifySide) == 'string' then
+local currentNotifySide = Obsidian.NotifySide or "Right"
+if type(currentNotifySide) == "string" then
     currentNotifySide = currentNotifySide:sub(1, 1):upper()
         .. currentNotifySide:sub(2):lower()
 else
-    currentNotifySide = 'Right'
+    currentNotifySide = "Right"
 end
 
-uiSettings:AddDropdown('NotifySideDropdown', {
-    Text = 'Notification side',
-    Values = { 'Right', 'Left' },
+uiSettings:AddDropdown("NotifySideDropdown", {
+    Text = "Notification side",
+    Values = { "Right", "Left" },
     Default = currentNotifySide,
     Callback = function(value)
-        local side = (value == 'Left') and 'Left' or 'Right'
+        local side = (value == "Left") and "Left" or "Right"
         Obsidian:SetNotifySide(side)
     end,
 })
 
-uiSettings:AddToggle('CompactSidebarToggle', {
-    Text = 'Compact sidebar layout',
+uiSettings:AddToggle("CompactSidebarToggle", {
+    Text = "Compact sidebar layout",
     Default = Window:IsSidebarCompacted(),
     Callback = function(v)
         Window:SetCompact(v)
     end,
 })
 
-local toggleKeyLabel = uiSettings:AddLabel('UI toggle key')
+local toggleKeyLabel = uiSettings:AddLabel("UI toggle key")
 local toggleKeyPicker
 local function resolveKeyCode(nameOrEnum)
-    if typeof(nameOrEnum) == 'EnumItem' then
+    if typeof(nameOrEnum) == "EnumItem" then
         return nameOrEnum
     end
-    if typeof(nameOrEnum) == 'string' then
+    if typeof(nameOrEnum) == "string" then
         for _, item in Enum.KeyCode:GetEnumItems() do
             if item.Name == nameOrEnum then
                 return item
@@ -1272,15 +1321,15 @@ local function applyUIToggleKey()
     end
 end
 
-local toggleKeyDefault = 'RightControl'
-if typeof(Obsidian.ToggleKeybind) == 'EnumItem' then
+local toggleKeyDefault = "RightControl"
+if typeof(Obsidian.ToggleKeybind) == "EnumItem" then
     toggleKeyDefault = Obsidian.ToggleKeybind.Name
 end
 
-toggleKeyLabel:AddKeyPicker('UIToggleKeyPicker', {
-    Text = 'UI Toggle Key',
+toggleKeyLabel:AddKeyPicker("UIToggleKeyPicker", {
+    Text = "UI Toggle Key",
     Default = toggleKeyDefault,
-    Mode = 'Toggle',
+    Mode = "Toggle",
     SyncToggleState = false,
 })
 toggleKeyPicker = Obsidian.Options.UIToggleKeyPicker
@@ -1289,9 +1338,9 @@ if toggleKeyPicker then
     applyUIToggleKey()
 end
 
-local scriptGroup = TabSettings:AddRightGroupbox('Script Controls')
-brpcToggle = scriptGroup:AddToggle('BloxstrapRPC', {
-    Text = 'Bloxstrap RPC',
+local scriptGroup = TabSettings:AddRightGroupbox("Script Controls")
+brpcToggle = scriptGroup:AddToggle("BloxstrapRPC", {
+    Text = "Bloxstrap RPC",
     Default = BRPCEnabled,
     Callback = function(v)
         BRPCEnabled = v
@@ -1301,8 +1350,8 @@ brpcToggle = scriptGroup:AddToggle('BloxstrapRPC', {
     end,
 })
 
-scriptGroup:AddButton('Reload script', {
-    Text = 'Reload script',
+scriptGroup:AddButton("Reload script", {
+    Text = "Reload script",
     Func = function()
         AutoEnabled = false
         pcall(ReleaseAllActiveLanes)
@@ -1311,12 +1360,12 @@ scriptGroup:AddButton('Reload script', {
         regGuiListeners()
         scan()
         AutoEnabled = true
-        notify('FNB', 'Reloaded.', 4)
+        notify("FNB", "Reloaded.", 4)
     end,
 })
 
-scriptGroup:AddButton('Unload script', {
-    Text = 'Unload script',
+scriptGroup:AddButton("Unload script", {
+    Text = "Unload script",
     Func = function()
         AutoEnabled = false
         pcall(ReleaseAllActiveLanes)
@@ -1329,29 +1378,29 @@ scriptGroup:AddButton('Unload script', {
 
 local SaveManager = loadstring(
     game:HttpGet(
-        'https://raw.githubusercontent.com/deividcomsono/Obsidian/refs/heads/main/addons/SaveManager.lua'
+        "https://raw.githubusercontent.com/deividcomsono/Obsidian/refs/heads/main/addons/SaveManager.lua"
     )
 )()
 SaveManager:SetLibrary(Obsidian)
-SaveManager:SetFolder('ltseverydayyou-fnb')
+SaveManager:SetFolder("ltseverydayyou-fnb")
 SaveManager:IgnoreThemeSettings()
 SaveManager:BuildConfigSection(TabSettings)
 SaveManager:LoadAutoloadConfig()
 
 local ThemeManager = loadstring(
     game:HttpGet(
-        'https://raw.githubusercontent.com/deividcomsono/Obsidian/refs/heads/main/addons/ThemeManager.lua'
+        "https://raw.githubusercontent.com/deividcomsono/Obsidian/refs/heads/main/addons/ThemeManager.lua"
     )
 )()
 ThemeManager:SetLibrary(Obsidian)
-ThemeManager:SetFolder('ltseverydayyou-fnb')
+ThemeManager:SetFolder("ltseverydayyou-fnb")
 ThemeManager:ApplyToTab(TabSettings)
 
 local function reqok()
-    return typeof(hookmetamethod) == 'function'
-        and typeof(newcclosure) == 'function'
-        and typeof(getnamecallmethod) == 'function'
-        and typeof(checkcaller) == 'function'
+    return typeof(hookmetamethod) == "function"
+        and typeof(newcclosure) == "function"
+        and typeof(getnamecallmethod) == "function"
+        and typeof(checkcaller) == "function"
 end
 local function notifyMissing(t, c)
     notify(t, c, 7)
@@ -1362,18 +1411,14 @@ do
     if not reqok() then
         miss = true
         notifyMissing(
-            'Missing requirement',
-            'hookmetamethod/newcclosure/getnamecallmethod/checkcaller'
+            "Missing requirement",
+            "hookmetamethod/newcclosure/getnamecallmethod/checkcaller"
         )
-    end
-    if imode == 'Button' and typeof(firesignal) ~= 'function' then
-        miss = true
-        notifyMissing('Missing requirement', 'firesignal (needed for button input mode)')
     end
     if miss then
         notifyMissing(
-            'FNB Autoplayer',
-            'One or more requirements are missing; functionality may be limited.'
+            "FNB Autoplayer",
+            "One or more requirements are missing; functionality may be limited."
         )
     end
 end
@@ -1383,12 +1428,12 @@ do
         local oldIndex
         local oldNamecall
 
-        oldIndex = hookmetamethod(game, '__index', function(self, m)
+        oldIndex = hookmetamethod(game, "__index", function(self, m)
             if
                 not checkcaller()
                 and self == Client
-                and typeof(m) == 'string'
-                and m:lower() == 'kick'
+                and typeof(m) == "string"
+                and m:lower() == "kick"
             then
                 return error(
                     "Expected ':' not '.' calling member function Kick",
@@ -1400,32 +1445,32 @@ do
 
         oldNamecall = hookmetamethod(
             game,
-            '__namecall',
+            "__namecall",
             newcclosure(function(self, ...)
-                local l = (getnamecallmethod() or ''):lower()
+                local l = (getnamecallmethod() or ""):lower()
 
                 if not checkcaller() then
-                    if self == Client and l == 'kick' then
+                    if self == Client and l == "kick" then
                         return
                     end
 
-                    if l == 'findservice' then
+                    if l == "findservice" then
                         local first = ...
                         if
-                            typeof(first) == 'string'
-                            and first:lower() == 'virtualinputmanager'
+                            typeof(first) == "string"
+                            and first:lower() == "virtualinputmanager"
                         then
                             return
                         end
                     end
 
                     if
-                        typeof(self) == 'Instance'
-                        and (l == 'fireserver' or l == 'invokeserver')
+                        typeof(self) == "Instance"
+                        and (l == "fireserver" or l == "invokeserver")
                     then
                         local name = tostring(self.Name)
 
-                        if name:lower() == 'userinputasync' then
+                        if name:lower() == "userinputasync" then
                             return
                         end
 
@@ -1434,9 +1479,9 @@ do
                         end
 
                         if
-                            name == 'TakeDamage'
+                            name == "TakeDamage"
                             and self.Parent
-                            and self.Parent.Name == 'Engine'
+                            and self.Parent.Name == "Engine"
                         then
                             return
                         end
@@ -1444,11 +1489,11 @@ do
                         if self == RF and AntiMissEnabled then
                             local args = { ... }
                             local payload = args[2]
-                            if typeof(payload) == 'table' then
+                            if typeof(payload) == "table" then
                                 local stateBuf = payload[1]
-                                if typeof(stateBuf) == 'buffer' then
+                                if typeof(stateBuf) == "buffer" then
                                     local state = buffer.tostring(stateBuf)
-                                    if state and state:find('Miss') then
+                                    if state and state:find("Miss") then
                                         return
                                     end
                                 end
@@ -1463,17 +1508,17 @@ do
         )
 
         local real_require = require
-        local patched = setmetatable({}, { __mode = 'k' })
+        local patched = setmetatable({}, { __mode = "k" })
 
         require = function(mod)
             local ok, obj = pcall(real_require, mod)
             if not ok then
                 error(obj, 2)
             end
-            if type(obj) == 'table' and not patched[obj] then
-                if tostring(rawget(obj, 'Type') or '') == 'OnMiss' then
-                    obj.Type = 'OnHit'
-                    if type(obj.Run) == 'function' then
+            if type(obj) == "table" and not patched[obj] then
+                if tostring(rawget(obj, "Type") or "") == "OnMiss" then
+                    obj.Type = "OnHit"
+                    if type(obj.Run) == "function" then
                         obj.Run = function() end
                     end
                 end
@@ -1485,14 +1530,16 @@ do
 end
 
 onChildAdded = function(Object)
-    if not Object or Object.Name ~= 'FNFEngine' then
+    if not Object or Object.Name ~= "FNFEngine" then
         scan()
         return
     end
     local Engine = Object.Engine
-    task.spawn(function() purgeLullaby(Engine) end)
+    task.spawn(function()
+        purgeLullaby(Engine)
+    end)
     local function IsOnHit(m)
-        return (m ~= nil and require(m).Type == 'OnHit')
+        return (m ~= nil and require(m).Type == "OnHit")
     end
     local function Filter(iter, fn)
         local t = {}
@@ -1512,23 +1559,23 @@ onChildAdded = function(Object)
     )
         or (function()
             local p = Song and Song.Parent
-            local s = p and p:FindFirstChild('Sound')
-            local ps = s and s:FindFirstChild('PlaybackSpeed')
+            local s = p and p:FindFirstChild("Sound")
+            local ps = s and s:FindFirstChild("PlaybackSpeed")
             return (ps and tonumber(ps.Value)) or 1
         end)()
     local baseOffset = computeBaseOffset(scrollSpeed)
     local Arrows = Object.Engine.Game[Object.Engine.PlayerSide.Value].Arrows
     local IncomingNotes = Filter(Arrows.IncomingNotes:GetChildren(), function(v)
-        return not string.find(v.Name, '|') and v or nil
+        return not string.find(v.Name, "|") and v or nil
     end)
     if Song then
         PoisonNotes = (
-            Song.Parent:FindFirstChild('MultiplieGimmickNotes')
-            or Song:FindFirstChild('GimmickNotes')
-            or Song.Parent:FindFirstChild('GimmickNotes')
-            or Song:FindFirstChild('MineNotes')
+            Song.Parent:FindFirstChild("MultiplieGimmickNotes")
+            or Song:FindFirstChild("GimmickNotes")
+            or Song.Parent:FindFirstChild("GimmickNotes")
+            or Song:FindFirstChild("MineNotes")
             or {}
-        ).Value == 'OnHit'
+        ).Value == "OnHit"
     end
     local Map = Keys[#IncomingNotes] or {}
     local Session = {}
@@ -1538,23 +1585,23 @@ onChildAdded = function(Object)
         local code = Enum.KeyCode[bindValue] or Enum.KeyCode.Space
         Session[kn] = code
     end
-    if IsOnMobile then
-        local mb = Object.Engine:FindFirstChild('MobileButtons')
-        local cont = mb and mb:FindFirstChild('Container')
-        if cont and HideMobileBtns then
-            cont.Visible = false
-        end
+
+    local mbMain = Object.Engine:FindFirstChild("MobileButtons")
+    local contMain = mbMain and mbMain:FindFirstChild("Container")
+    if contMain then
+        contMain.Visible = not HideMobileBtns
     end
-    local MobileButtons = Object.Engine:FindFirstChild('MobileButtons')
+
+    local MobileButtons = Object.Engine:FindFirstChild("MobileButtons")
     local MobileContainer = MobileButtons
-        and MobileButtons:FindFirstChild('Container')
+        and MobileButtons:FindFirstChild("Container")
     local function pressLane(name, keyCode)
-        if imode == 'Button' then
+        if InputMode == "firesignal" then
             pressLaneMobile(MobileContainer, name)
             return
         end
-        if Mode == 'actor' then
-            if not actorKey('press', keyCode.Name) then
+        if Mode == "actor" then
+            if not actorKey("press", keyCode.Name) then
                 VirtualInputManager:SendKeyEvent(true, keyCode, false, nil)
             end
             return
@@ -1562,12 +1609,12 @@ onChildAdded = function(Object)
         VirtualInputManager:SendKeyEvent(true, keyCode, false, nil)
     end
     local function releaseLane(name, keyCode)
-        if imode == 'Button' then
+        if InputMode == "firesignal" then
             releaseLaneMobile(MobileContainer, name)
             return
         end
-        if Mode == 'actor' then
-            if not actorKey('release', keyCode.Name) then
+        if Mode == "actor" then
+            if not actorKey("release", keyCode.Name) then
                 VirtualInputManager:SendKeyEvent(false, keyCode, false, nil)
             end
             return
@@ -1590,11 +1637,11 @@ onChildAdded = function(Object)
             laneCount[k] = 0
         end
     end
-    local lower = Object.Engine:FindFirstChild('LowerContainer')
-    local credit = lower and lower:FindFirstChild('Credit')
-    local psVal = Object.Engine:FindFirstChild('PlayerSide')
+    local lower = Object.Engine:FindFirstChild("LowerContainer")
+    local credit = lower and lower:FindFirstChild("Credit")
+    local psVal = Object.Engine:FindFirstChild("PlayerSide")
     if credit then
-        connections:add(credit:GetPropertyChangedSignal('Text'), scan)
+        connections:add(credit:GetPropertyChangedSignal("Text"), scan)
     end
     if psVal then
         connections:add(psVal.Changed, scan)
@@ -1619,11 +1666,11 @@ onChildAdded = function(Object)
                 return
             end
 
-            local arrowName = tostring(Arrow.Name or '')
-            local isOrange = arrowName:find('_OrangeNote', 1, true) ~= nil
+            local arrowName = tostring(Arrow.Name or "")
+            local isOrange = arrowName:find("_OrangeNote", 1, true) ~= nil
 
             if
-                Arrow:FindFirstChild('HellNote')
+                Arrow:FindFirstChild("HellNote")
                 and Arrow.HellNote.Value
                 and PoisonNotes
                 and not isOrange
@@ -1633,7 +1680,7 @@ onChildAdded = function(Object)
 
             if
                 not isOrange
-                and IsOnHit(Arrow:FindFirstChildOfClass('ModuleScript'))
+                and IsOnHit(Arrow:FindFirstChildOfClass("ModuleScript"))
             then
                 return
             end
@@ -1659,26 +1706,26 @@ end
 
 regGuiListeners = function()
     connections:add(PlayerGui.ChildAdded, function(o)
-        if o and o.Name == 'FNFEngine' then
+        if o and o.Name == "FNFEngine" then
             applyMods(true)
         end
-        if o and o.Name == 'GameUI' then
+        if o and o.Name == "GameUI" then
             attachScrollWatcher()
             watchSongSel(o)
         end
     end)
     connections:add(PlayerGui.ChildAdded, function(o)
-        if o and o.Name == 'FNFEngine' then
+        if o and o.Name == "FNFEngine" then
             task.spawn(function()
                 onChildAdded(o)
             end)
         end
     end)
     connections:add(PlayerGui.ChildRemoved, function(o)
-        if o and o.Name == 'FNFEngine' then
+        if o and o.Name == "FNFEngine" then
             scan()
         end
-        if o and o.Name == 'GameUI' then
+        if o and o.Name == "GameUI" then
             detachScrollWatcher()
             clearSongWatch()
         end
@@ -1686,21 +1733,23 @@ regGuiListeners = function()
 
     connections:add(PlayerGui.DescendantAdded, function(o)
         if
-            o.Name == 'TakeDamage'
+            o.Name == "TakeDamage"
             and o.Parent
-            and o.Parent.Name == 'Engine'
+            and o.Parent.Name == "Engine"
         then
             TakeDamageRemote = o
         end
     end)
 
-    local existingEngine = PlayerGui:FindFirstChild('FNFEngine')
+    local existingEngine = PlayerGui:FindFirstChild("FNFEngine")
     if existingEngine then
         applyMods(true)
-        local engine = existingEngine:FindFirstChild('Engine')
+        local engine = existingEngine:FindFirstChild("Engine")
         if engine then
-            task.spawn(function() purgeLullaby(engine) end)
-            local td = engine:FindFirstChild('TakeDamage')
+            task.spawn(function()
+                purgeLullaby(engine)
+            end)
+            local td = engine:FindFirstChild("TakeDamage")
             if td then
                 TakeDamageRemote = td
             end
@@ -1709,7 +1758,7 @@ regGuiListeners = function()
             onChildAdded(existingEngine)
         end)
     end
-    local existingGameUI = PlayerGui:FindFirstChild('GameUI')
+    local existingGameUI = PlayerGui:FindFirstChild("GameUI")
     if existingGameUI then
         attachScrollWatcher()
         watchSongSel(existingGameUI)
@@ -1719,20 +1768,14 @@ end
 regGuiListeners()
 scan()
 
-updateInputMode(UserInputService:GetLastInputType())
-
-connections:add(UserInputService.LastInputTypeChanged, function(t)
-    updateInputMode(t)
-end)
-
 for _, v in pairs(workspace:GetDescendants()) do
-    if v.ClassName == 'ProximityPrompt' then
+    if v.ClassName == "ProximityPrompt" then
         v.HoldDuration = 0
     end
 end
 
-if Keybinds.R4.Value == ';' then
-    RE:FireServer('REMOTE_EVENT', {
+if Keybinds.R4.Value == ";" then
+    RE:FireServer("REMOTE_EVENT", {
         buffer.fromstring('"Input"'),
         buffer.fromstring('"Semicolon"'),
         buffer.fromstring('"R4"'),
