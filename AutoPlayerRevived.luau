@@ -752,16 +752,20 @@ local function purgeLullaby(engine)
         end
     end
     connections:add(engine.ChildAdded, function(c)
-        if c.Name == "background" and c:IsA("Frame") then
-            c:Destroy()
-        elseif c.Name == "static" and c:IsA("Sound") then
-            c:Destroy()
-        end
+        task.defer(function()
+            if c.Name == "background" and c:IsA("Frame") then
+                c:Destroy()
+            elseif c.Name == "static" and c:IsA("Sound") then
+                c:Destroy()
+            end
+        end)
     end)
     connections:add(engine.ChildAdded, function(d)
-        if d.Name == "static" and d:IsA("Sound") then
-            d:Destroy()
-        end
+        task.defer(function()
+            if d.Name == "static" and d:IsA("Sound") then
+                d:Destroy()
+            end
+        end)
     end)
 end
 
@@ -803,11 +807,11 @@ local function watchSolo(enabled)
         return
     end
     watchers.solo = PlayerGui.ChildAdded:Connect(function(child)
-        if child and child.Name == "SingleplayerUI" then
-            task.defer(function()
+        task.defer(function()
+            if child and child.Name == "SingleplayerUI" then
                 doSolo(child)
-            end)
-        end
+            end
+        end)
     end)
     local existing = PlayerGui:FindFirstChild("SingleplayerUI")
     if existing then
@@ -991,9 +995,11 @@ local function watchSongSel(gameUI)
         return
     end
     local function onChildAdded(child)
-        if child and child.Name == "SongSelect" then
-            bindSongVis(child)
-        end
+        task.defer(function()
+            if child and child.Name == "SongSelect" then
+                bindSongVis(child)
+            end
+        end)
     end
     watchers.songChild = gameUI.ChildAdded:Connect(onChildAdded)
     onChildAdded(gameUI:FindFirstChild("SongSelect"))
@@ -1662,64 +1668,68 @@ onChildAdded = function(Object)
     end)
     for _, Holder in pairs(IncomingNotes) do
         connections:add(Holder.ChildAdded, function(Arrow)
-            if not Arrow or not Arrow.Visible then
-                return
-            end
+            task.defer(function()
+                if not Arrow or not Arrow.Visible then
+                    return
+                end
 
-            local arrowName = tostring(Arrow.Name or "")
-            local isOrange = arrowName:find("_OrangeNote", 1, true) ~= nil
+                local arrowName = tostring(Arrow.Name or "")
+                local isOrange = arrowName:find("_OrangeNote", 1, true) ~= nil
 
-            if
-                Arrow:FindFirstChild("HellNote")
-                and Arrow.HellNote.Value
-                and PoisonNotes
-                and not isOrange
-            then
-                return
-            end
+                if
+                    Arrow:FindFirstChild("HellNote")
+                    and Arrow.HellNote.Value
+                    and PoisonNotes
+                    and not isOrange
+                then
+                    return
+                end
 
-            if
-                not isOrange
-                and IsOnHit(Arrow:FindFirstChildOfClass("ModuleScript"))
-            then
-                return
-            end
+                if
+                    not isOrange
+                    and IsOnHit(Arrow:FindFirstChildOfClass("ModuleScript"))
+                then
+                    return
+                end
 
-            local keyCode = Session[Holder.Name]
-            if not keyCode then
-                return
-            end
-            if not AutoEnabled then
-                return
-            end
+                local keyCode = Session[Holder.Name]
+                if not keyCode then
+                    return
+                end
+                if not AutoEnabled then
+                    return
+                end
 
-            AutoCtx.enabled = AutoEnabled
-            AutoCtx.offsetMs = OffsetMs
-            AutoCtx.baseOffset = computeBaseOffset(
-                (Input.ScrollSpeedChange.Value and Input.ScrollSpeed.Value) or 1
-            )
+                AutoCtx.enabled = AutoEnabled
+                AutoCtx.offsetMs = OffsetMs
+                AutoCtx.baseOffset = computeBaseOffset(
+                    (Input.ScrollSpeedChange.Value and Input.ScrollSpeed.Value) or 1
+                )
 
-            playNoteSequence(Holder, Arrow, keyCode, AutoCtx)
+                playNoteSequence(Holder, Arrow, keyCode, AutoCtx)
+            end)
         end)
     end
 end
 
 regGuiListeners = function()
     connections:add(PlayerGui.ChildAdded, function(o)
-        if o and o.Name == "FNFEngine" then
-            applyMods(true)
-        end
-        if o and o.Name == "GameUI" then
-            attachScrollWatcher()
-            watchSongSel(o)
-        end
+        task.defer(function()
+            if o and o.Name == "FNFEngine" then
+                applyMods(true)
+            end
+            if o and o.Name == "GameUI" then
+                attachScrollWatcher()
+                watchSongSel(o)
+            end
+        end)
     end)
     connections:add(PlayerGui.ChildAdded, function(o)
-        if o and o.Name == "FNFEngine" then
-            task.spawn(function()
+        task.defer(function()
+            if o and o.Name == "FNFEngine" then
                 onChildAdded(o)
-            end)
-        end
+            end
+        end)
     end)
     connections:add(PlayerGui.ChildRemoved, function(o)
         if o and o.Name == "FNFEngine" then
@@ -1732,13 +1742,15 @@ regGuiListeners = function()
     end)
 
     connections:add(PlayerGui.DescendantAdded, function(o)
-        if
-            o.Name == "TakeDamage"
-            and o.Parent
-            and o.Parent.Name == "Engine"
-        then
-            TakeDamageRemote = o
-        end
+        task.defer(function()
+            if
+                o.Name == "TakeDamage"
+                and o.Parent
+                and o.Parent.Name == "Engine"
+            then
+                TakeDamageRemote = o
+            end
+        end)
     end)
 
     local existingEngine = PlayerGui:FindFirstChild("FNFEngine")
