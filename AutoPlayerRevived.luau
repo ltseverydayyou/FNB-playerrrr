@@ -958,6 +958,7 @@ inputModeDropdown = MainControls:AddDropdown("InputMode", {
 		InputMode = sel;
 	end
 });
+MainControls:AddLabel("if firesignal doesn't work\nswitch to Virtual Input");
 hideMobileToggle = MiscControls:AddToggle("HideMobileButtons", {
 	Text = "Hide Mobile Buttons",
 	Default = true,
@@ -1115,7 +1116,7 @@ else
 		DoesWrap = true
 	});
 end;
-creditsGroup:AddLabel("Anticheat bypass by ltseverydayyou");
+creditsGroup:AddLabel("AC bypass by ltseverydayyou");
 local uiSettings = TabSettings:AddLeftGroupbox("UI Settings");
 cursorToggle = uiSettings:AddToggle("ObsidianCursor", {
 	Text = "Show Obsidian cursor",
