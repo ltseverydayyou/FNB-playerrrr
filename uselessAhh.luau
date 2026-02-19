@@ -11,6 +11,10 @@ local genv = getgenv();
 local type = type;
 local game = game;
 local task = task;
+if type(hookmetamethod) ~= "function" or type(checkcaller) ~= "function" or type(getnamecallmethod) ~= "function" or type(getcallingscript) ~= "function" or type(hookfunction) ~= "function" then
+	genv.IsAnimeFan = true;
+	return;
+end;
 if not (getgenv()).IsAnimeFan then
 	local creating_methods = {
 		getService = true,
