@@ -5,6 +5,69 @@ if game.GameId ~= 2953945619 then
 	return
 end
 
+local function executorName()
+	if typeof(identifyexecutor) ~= "function" then
+		return ""
+	end
+	local ok, name = pcall(identifyexecutor)
+	if ok and type(name) == "string" then
+		return name
+	end
+	return ""
+end
+
+local ExecutorName = executorName()
+local ExecutorNameLower = string.lower(ExecutorName)
+local IsSolaraOrXeno = ExecutorNameLower == "solara" or ExecutorNameLower == "xeno"
+
+if IsSolaraOrXeno and typeof(getfenv) == "function" then
+	local realGame = game
+	local oldFindService = realGame.FindService
+	local oldGetService = realGame.GetService
+	local env = getfenv()
+
+	if type(env) == "table" and type(oldFindService) == "function" and type(oldGetService) == "function" then
+		env.game = setmetatable({}, {
+			__index = function(_, key)
+				if key == "FindService" or key == "findService" then
+					return function(self, serviceName)
+						local callerSafe = typeof(checkcaller) == "function" and checkcaller()
+						if not callerSafe and serviceName == "VirtualInputManager" then
+							return nil
+						end
+						return oldFindService(realGame, serviceName)
+					end
+				elseif key == "GetService" or key == "getService" then
+					return function(self, serviceName)
+						local callerSafe = typeof(checkcaller) == "function" and checkcaller()
+						if not callerSafe and serviceName == "VirtualInputManager" then
+							return nil
+						end
+						return oldGetService(realGame, serviceName)
+					end
+				end
+				return realGame[key]
+			end,
+			__tostring = function()
+				return "game"
+			end
+		})
+
+		env.u21 = {
+			IsStudio = function()
+				return true
+			end
+		}
+
+		if typeof(getgenv) == "function" then
+			local ok, genv = pcall(getgenv)
+			if ok and type(genv) == "table" then
+				genv.u21 = env.u21
+			end
+		end
+	end
+end
+
 local connections = {
 	_list = {},
 	add = function(self, s, cb)
@@ -85,7 +148,7 @@ local MarketplaceService = game:GetService("MarketplaceService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
-local hasKeySim = typeof(keypress) == "function" and typeof(keyrelease) == "function"
+local hasKeySim = not IsSolaraOrXeno and typeof(keypress) == "function" and typeof(keyrelease) == "function"
 
 local vim
 local function getVIM()
@@ -798,7 +861,7 @@ local function actorKey(op, keyCode)
 	local down = op == "press"
 	local src = string.format([[
 		local kpress, krelease = keypress, keyrelease
-		local hasKeySim = typeof(kpress) == "function" and typeof(krelease) == "function"
+		local hasKeySim = %s and typeof(kpress) == "function" and typeof(krelease) == "function"
 		local vim
 		if not hasKeySim then
 			local ok, svc = pcall(game.GetService, game, "VirtualInputManager")
@@ -821,7 +884,7 @@ local function actorKey(op, keyCode)
 		else
 			vim:SendKeyEvent(isDown, kc, false, nil)
 		end
-	]], down and "true" or "false", keyCode.Name, vk)
+	]], IsSolaraOrXeno and "false" or "true", down and "true" or "false", keyCode.Name, vk)
 
 	pcall(run_on_actor, actors[1], src)
 	return true
@@ -1661,8 +1724,14 @@ onChildAdded = function(Object)
 		return ps and tonumber(ps.Value) or 1
 	end)()
 	local baseOffset = computeBaseOffset(scrollSpeed)
-	local Arrows = Object.Engine.Game[Object.Engine.PlayerSide.Value].Arrows
-	local IncomingNotes = Filter(Arrows.IncomingNotes:GetChildren(), function(v)
+	local sideValue = Object.Engine.PlayerSide.Value
+	local sideFolder = Object.Engine.Game:FindFirstChild(sideValue)
+	local Arrows = sideFolder and sideFolder:FindFirstChild("Arrows")
+	local incomingFolder = Arrows and Arrows:FindFirstChild("IncomingNotes")
+	if not incomingFolder then
+		return
+	end
+	local IncomingNotes = Filter(incomingFolder:GetChildren(), function(v)
 		return not string.find(v.Name, "|") and v or nil
 	end)
 	if Song then
@@ -1803,6 +1872,24 @@ onChildAdded = function(Object)
 		local newValue = clampSpeed(Input.ScrollSpeed.Value)
 		syncSlider(newValue)
 	end)
+
+	if IsSolaraOrXeno then
+		local otherSideValue = sideValue == "L" and "R" or "L"
+		local otherSideFolder = Object.Engine.Game:FindFirstChild(otherSideValue)
+		local otherArrows = otherSideFolder and otherSideFolder:FindFirstChild("Arrows")
+		local otherIncoming = otherArrows and otherArrows:FindFirstChild("IncomingNotes")
+		if otherIncoming then
+			for _, otherHolder in pairs(otherIncoming:GetChildren()) do
+				connections:add(otherHolder.ChildAdded, function(otherArrow)
+					task.defer(function()
+						if otherArrow and otherArrow.Parent then
+							otherArrow:Destroy()
+						end
+					end)
+				end)
+			end
+		end
+	end
 
 	for _, Holder in pairs(IncomingNotes) do
 		connections:add(Holder.ChildAdded, function(Arrow)
