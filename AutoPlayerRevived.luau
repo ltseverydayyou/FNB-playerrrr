@@ -148,7 +148,89 @@ local MarketplaceService = game:GetService("MarketplaceService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
-local hasKeySim = not IsSolaraOrXeno and typeof(keypress) == "function" and typeof(keyrelease) == "function"
+local function testKeyAPI()
+	if IsSolaraOrXeno then
+		return false
+	end
+	if typeof(keypress) ~= "function" or typeof(keyrelease) ~= "function" then
+		return false
+	end
+	if UserInputService:IsKeyDown(Enum.KeyCode.RightAlt) then
+		return false
+	end
+	local st = 0
+	local bad = false
+	local conA
+	local conB
+	local function stopTest()
+		if conA then
+			conA:Disconnect()
+			conA = nil
+		end
+		if conB then
+			conB:Disconnect()
+			conB = nil
+		end
+	end
+	conA = UserInputService.InputBegan:Connect(function(io, gpe)
+		if gpe then
+			return
+		end
+		if io.KeyCode == Enum.KeyCode.RightAlt then
+			if st ~= 1 then
+				bad = true
+				stopTest()
+				return
+			end
+			st = 2
+		end
+	end)
+	conB = UserInputService.InputEnded:Connect(function(io, gpe)
+		if gpe then
+			return
+		end
+		if io.KeyCode == Enum.KeyCode.RightAlt then
+			if st ~= 2 then
+				bad = true
+				stopTest()
+				return
+			end
+			st = 3
+		end
+	end)
+	st = 1
+	local okD = pcall(keypress, 0xA5)
+	if not okD then
+		stopTest()
+		return false
+	end
+	local t0 = tick()
+	while (not bad) and st < 2 and tick() - t0 < 0.12 do
+		task.wait()
+	end
+	if bad or st < 2 then
+		pcall(keyrelease, 0xA5)
+		stopTest()
+		return false
+	end
+	local okU = pcall(keyrelease, 0xA5)
+	if not okU then
+		stopTest()
+		return false
+	end
+	local t1 = tick()
+	while (not bad) and st < 3 and tick() - t1 < 0.12 do
+		task.wait()
+	end
+	stopTest()
+	return (not bad) and st == 3
+end
+
+local hasKeyAPI = testKeyAPI()
+local KeyMode = hasKeyAPI and "API" or "VIM"
+local function useKeyAPI()
+	return hasKeyAPI and KeyMode == "API"
+end
 
 local vim
 local function getVIM()
@@ -859,32 +941,41 @@ local function actorKey(op, keyCode)
 	end
 
 	local down = op == "press"
+	local useAPI = useKeyAPI()
 	local src = string.format([[
 		local kpress, krelease = keypress, keyrelease
-		local hasKeySim = %s and typeof(kpress) == "function" and typeof(krelease) == "function"
+		local useKeyAPI = %s and typeof(kpress) == "function" and typeof(krelease) == "function"
 		local vim
-		if not hasKeySim then
+		if not useKeyAPI then
 			local ok, svc = pcall(game.GetService, game, "VirtualInputManager")
 			if ok and svc then
 				vim = svc
 			end
 		end
-		if not hasKeySim and not vim then
-			return
-		end
 		local isDown = %s
 		local kc = Enum.KeyCode[%q]
 		local vk = %d
-		if hasKeySim then
+		if useKeyAPI then
+			local ok
 			if isDown then
-				kpress(vk)
+				ok = pcall(kpress, vk)
 			else
-				krelease(vk)
+				ok = pcall(krelease, vk)
 			end
-		else
+			if ok then
+				return
+			end
+		end
+		if not vim then
+			local ok, svc = pcall(game.GetService, game, "VirtualInputManager")
+			if ok and svc then
+				vim = svc
+			end
+		end
+		if vim then
 			vim:SendKeyEvent(isDown, kc, false, nil)
 		end
-	]], IsSolaraOrXeno and "false" or "true", down and "true" or "false", keyCode.Name, vk)
+	]], useAPI and "true" or "false", down and "true" or "false", keyCode.Name, vk)
 
 	pcall(run_on_actor, actors[1], src)
 	return true
@@ -977,6 +1068,7 @@ local brpcToggle
 local cursorToggle
 local antiMissToggle
 local inputModeDropdown
+local keyModeDropdown
 
 local function doSolo(singleplayerUI)
 	local sp = singleplayerUI or PlayerGui:FindFirstChild("SingleplayerUI")
@@ -1263,6 +1355,24 @@ inputModeDropdown = MainControls:AddDropdown("InputMode", {
 		InputMode = sel
 	end
 })
+
+if hasKeyAPI then
+	keyModeDropdown = MainControls:AddDropdown("KeyMode", {
+		Text = "Keyboard backend",
+		Values = {
+			"API",
+			"VIM"
+		},
+		Default = KeyMode,
+		Callback = function(opt)
+			local sel = typeof(opt) == "table" and opt[1] or opt or "VIM"
+			if sel ~= "API" and sel ~= "VIM" then
+				sel = "VIM"
+			end
+			KeyMode = sel
+		end
+	})
+end
 
 MainControls:AddLabel("if firesignal doesn't work\nswitch to Virtual Input")
 
@@ -1753,6 +1863,30 @@ onChildAdded = function(Object)
 	local MobileButtons = Object.Engine:FindFirstChild("MobileButtons")
 	local MobileContainer = MobileButtons and MobileButtons:FindFirstChild("Container")
 
+	local function sendLaneKey(isDown, keyCode)
+		if not keyCode then
+			return
+		end
+		if useKeyAPI() then
+			local vk = toVK(keyCode)
+			if vk then
+				local ok
+				if isDown then
+					ok = pcall(keypress, vk)
+				else
+					ok = pcall(keyrelease, vk)
+				end
+				if ok then
+					return
+				end
+			end
+		end
+		local v = getVIM()
+		if v then
+			v:SendKeyEvent(isDown, keyCode, false, nil)
+		end
+	end
+
 	local function pressLane(name, keyCode)
 		if InputMode == "firesignal" then
 			pressLaneMobile(MobileContainer, name)
@@ -1760,35 +1894,11 @@ onChildAdded = function(Object)
 		end
 		if Mode == "actor" then
 			if not actorKey("press", keyCode) then
-				if hasKeySim then
-					local vk = toVK(keyCode)
-					if vk then
-						pcall(keypress, vk)
-					end
-				else
-					local vim = getVIM()
-					if vim then
-						vim:SendKeyEvent(true, keyCode, false, nil)
-					end
-				end
+				sendLaneKey(true, keyCode)
 			end
 			return
 		end
-		local v = getVIM()
-		if v and (IsOnMobile or (keyCode and keyCode.Name == "Semicolon")) then
-			v:SendKeyEvent(true, keyCode, false, nil)
-			return
-		end
-		if hasKeySim then
-			local vk = toVK(keyCode)
-			if vk then
-				pcall(keypress, vk)
-			end
-			return
-		end
-		if v then
-			v:SendKeyEvent(true, keyCode, false, nil)
-		end
+		sendLaneKey(true, keyCode)
 	end
 
 	local function releaseLane(name, keyCode)
@@ -1798,35 +1908,11 @@ onChildAdded = function(Object)
 		end
 		if Mode == "actor" then
 			if not actorKey("release", keyCode) then
-				if hasKeySim then
-					local vk = toVK(keyCode)
-					if vk then
-						pcall(keyrelease, vk)
-					end
-				else
-					local vim = getVIM()
-					if vim then
-						vim:SendKeyEvent(false, keyCode, false, nil)
-					end
-				end
+				sendLaneKey(false, keyCode)
 			end
 			return
 		end
-		local v = getVIM()
-		if v and (IsOnMobile or (keyCode and keyCode.Name == "Semicolon")) then
-			v:SendKeyEvent(false, keyCode, false, nil)
-			return
-		end
-		if hasKeySim then
-			local vk = toVK(keyCode)
-			if vk then
-				pcall(keyrelease, vk)
-			end
-			return
-		end
-		if v then
-			v:SendKeyEvent(false, keyCode, false, nil)
-		end
+		sendLaneKey(false, keyCode)
 	end
 
 	local laneDown = {}
