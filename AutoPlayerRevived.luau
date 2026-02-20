@@ -87,12 +87,14 @@ local RunService = game:GetService("RunService")
 
 local hasKeySim = typeof(keypress) == "function" and typeof(keyrelease) == "function"
 
+local vim
 local function getVIM()
-	if hasKeySim then
-		return nil
+	if vim then
+		return vim
 	end
 	local ok, svc = pcall(game.GetService, game, "VirtualInputManager")
 	if ok and svc then
+		vim = svc
 		return svc
 	end
 	return nil
@@ -104,7 +106,19 @@ local vkMap = {
 	Up = 0x26,
 	Right = 0x27,
 	Down = 0x28,
+
 	Semicolon = 0xBA,
+	Equals = 0xBB,
+	Comma = 0xBC,
+	Minus = 0xBD,
+	Period = 0xBE,
+	Slash = 0xBF,
+	Backquote = 0xC0,
+	LeftBracket = 0xDB,
+	Backslash = 0xDC,
+	RightBracket = 0xDD,
+	Quote = 0xDE,
+
 	LeftShift = 0xA0,
 	RightShift = 0xA1,
 	LeftControl = 0xA2,
@@ -362,8 +376,12 @@ RunService.RenderStepped:Connect(function()
 	end)
 end)
 
+
 local charKeyMap = {
 	[";"] = "Semicolon",
+	[":"] = "Semicolon",
+	["#"] = "Semicolon",
+
 	["'"] = "Quote",
 	[","] = "Comma",
 	["."] = "Period",
@@ -375,6 +393,16 @@ local charKeyMap = {
 	["`"] = "Backquote",
 	["\\"] = "Backslash"
 }
+
+local function safeKeyCode(name)
+	if typeof(name) ~= "string" then
+		return nil
+	end
+	local ok, kc = pcall(function()
+		return Enum.KeyCode[name]
+	end)
+	return ok and kc or nil
+end
 
 local function resolveKeyName(value)
 	if value == nil then
@@ -1645,7 +1673,7 @@ onChildAdded = function(Object)
 	for kn, kv in pairs(Map) do
 		local bindObj = Keybinds[kv]
 		local bindValue = resolveKeyName(bindObj and bindObj.Value or kv)
-		local code = Enum.KeyCode[bindValue] or Enum.KeyCode.Space
+		local code = safeKeyCode(bindValue) or Enum.KeyCode.Space
 		Session[kn] = code
 	end
 	local mbMain = Object.Engine:FindFirstChild("MobileButtons")
@@ -1677,6 +1705,11 @@ onChildAdded = function(Object)
 			end
 			return
 		end
+		local v = getVIM()
+		if v and (IsOnMobile or (keyCode and keyCode.Name == "Semicolon")) then
+			v:SendKeyEvent(true, keyCode, false, nil)
+			return
+		end
 		if hasKeySim then
 			local vk = toVK(keyCode)
 			if vk then
@@ -1684,9 +1717,8 @@ onChildAdded = function(Object)
 			end
 			return
 		end
-		local vim = getVIM()
-		if vim then
-			vim:SendKeyEvent(true, keyCode, false, nil)
+		if v then
+			v:SendKeyEvent(true, keyCode, false, nil)
 		end
 	end
 
@@ -1711,6 +1743,11 @@ onChildAdded = function(Object)
 			end
 			return
 		end
+		local v = getVIM()
+		if v and (IsOnMobile or (keyCode and keyCode.Name == "Semicolon")) then
+			v:SendKeyEvent(false, keyCode, false, nil)
+			return
+		end
 		if hasKeySim then
 			local vk = toVK(keyCode)
 			if vk then
@@ -1718,9 +1755,8 @@ onChildAdded = function(Object)
 			end
 			return
 		end
-		local vim = getVIM()
-		if vim then
-			vim:SendKeyEvent(false, keyCode, false, nil)
+		if v then
+			v:SendKeyEvent(false, keyCode, false, nil)
 		end
 	end
 
@@ -1866,10 +1902,13 @@ for _, v in pairs(workspace:GetDescendants()) do
 	end
 end
 
-if Keybinds.R4.Value == ";" then
-	RE:FireServer("REMOTE_EVENT", {
-		buffer.fromstring("\"Input\""),
-		buffer.fromstring("\"Semicolon\""),
-		buffer.fromstring("\"R4\"")
-	})
+do
+	local v = resolveKeyName(Keybinds.R4 and Keybinds.R4.Value)
+	if v == "Semicolon" then
+		RE:FireServer("REMOTE_EVENT", {
+			buffer.fromstring("\"Input\""),
+			buffer.fromstring("\"Semicolon\""),
+			buffer.fromstring("\"R4\"")
+		})
+	end
 end
