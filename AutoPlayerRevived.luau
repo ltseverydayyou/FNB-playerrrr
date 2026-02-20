@@ -362,6 +362,20 @@ RunService.RenderStepped:Connect(function()
 	end)
 end)
 
+local charKeyMap = {
+	[";"] = "Semicolon",
+	["'"] = "Quote",
+	[","] = "Comma",
+	["."] = "Period",
+	["/"] = "Slash",
+	["["] = "LeftBracket",
+	["]"] = "RightBracket",
+	["-"] = "Minus",
+	["="] = "Equals",
+	["`"] = "Backquote",
+	["\\"] = "Backslash"
+}
+
 local function resolveKeyName(value)
 	if value == nil then
 		return "Space"
@@ -370,6 +384,10 @@ local function resolveKeyName(value)
 		return value.Name
 	end
 	if typeof(value) == "string" then
+		local mapped = charKeyMap[value]
+		if mapped then
+			return mapped
+		end
 		return value
 	end
 	return tostring(value)
