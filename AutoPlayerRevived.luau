@@ -704,7 +704,7 @@ local function guiClick(btn)
 			if node:IsA("GuiButton") then
 				return node
 			end
-			for _, child in ipairs(node:GetDescendants()) do
+			for _, child in ipairs(node:QueryDescendants("Instance")) do
 				if child:IsA("GuiButton") then
 					return child
 				end
@@ -743,7 +743,7 @@ local function asClickable(node)
 	if node:IsA("GuiButton") then
 		return node
 	end
-	for _, child in ipairs(node:GetDescendants()) do
+	for _, child in ipairs(node:QueryDescendants("Instance")) do
 		if child:IsA("GuiButton") then
 			return child
 		end
@@ -768,7 +768,7 @@ local function findModButton(container, kind, name)
 			if clickable then
 				return clickable
 			end
-			for _, child in ipairs(bucket:GetDescendants()) do
+			for _, child in ipairs(bucket:QueryDescendants("Instance")) do
 				if normModKey(child.Name) == targetKey then
 					local btn = asClickable(child)
 					if btn then
@@ -2069,7 +2069,7 @@ end
 regGuiListeners()
 scan()
 
-for _, v in pairs(workspace:GetDescendants()) do
+for _, v in pairs(workspace:QueryDescendants("Instance")) do
 	if v.ClassName == "ProximityPrompt" then
 		v.HoldDuration = 0
 	end
