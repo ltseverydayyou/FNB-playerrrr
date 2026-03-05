@@ -1780,9 +1780,7 @@ do
 			return oldNamecall(self, ...)
 		end))
 		local real_require = require
-		local patched = setmetatable({}, {
-			__mode = "k"
-		})
+		local patched = {}
 		require = function(mod)
 			local ok, obj = pcall(real_require, mod)
 			if not ok then
