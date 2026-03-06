@@ -140,13 +140,13 @@ if SplashIndex == 15 then
 	SplashText = "officilly bypassed lmao"
 end
 
-local Client = game:GetService("Players").LocalPlayer
+local Client = cloneref(game:GetService("Players")).LocalPlayer
 local PlayerGui = Client.PlayerGui
-local UserInputService = game:GetService("UserInputService")
-local HttpService = game:GetService("HttpService")
-local MarketplaceService = game:GetService("MarketplaceService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
+local UserInputService = cloneref(game:GetService("UserInputService"))
+local HttpService = cloneref(game:GetService("HttpService"))
+local MarketplaceService = cloneref(game:GetService("MarketplaceService"))
+local ReplicatedStorage = cloneref(game:GetService("ReplicatedStorage"))
+local RunService = cloneref(game:GetService("RunService"))
 
 local function testKeyAPI()
 	if IsSolaraOrXeno then

@@ -1,3 +1,3 @@
-local ReplicatedStorage = game:GetService("ReplicatedStorage");
+local ReplicatedStorage = cloneref(game:GetService("ReplicatedStorage"));
 (require(ReplicatedStorage.Modules.Util)).ModchartCheck = function()
 end;
