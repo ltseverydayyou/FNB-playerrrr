@@ -1,33 +1,47 @@
-local __lt_oldcloneref = type(cloneref) == "function" and cloneref or nil
-local function __lt_clone_service_value(value)
-	if __lt_oldcloneref and typeof(value) == "Instance" then
-		local ok, cloned = pcall(__lt_oldcloneref, value)
+local __lt = { cr = type(cloneref) == "function" and cloneref or nil };
+function __lt.cv(value)
+	if __lt.cr and typeof(value) == "Instance" then
+		local ok, cloned = pcall(__lt.cr, value);
 		if ok and cloned ~= nil then
-			return cloned
-		end
-	end
-	return value
-end
-local function __lt_clone_service(name, refFn)
+			return cloned;
+		end;
+	end;
+	return value;
+end;
+function __lt.cs(name, refFn)
 	if type(refFn) ~= "function" then
-		return game:GetService(name)
-	end
+		return game:GetService(name);
+	end;
 	local ok, ref = pcall(function()
-		return refFn(game:GetService(name))
-	end)
+		return refFn(game:GetService(name));
+	end);
 	if ok and ref ~= nil then
-		return ref
-	end
-	return game:GetService(name)
-end
-local function __lt_call_service_method(name, method, ...)
-	local service = game:GetService(name)
-	local fn = service[method]
+		return ref;
+	end;
+	return game:GetService(name);
+end;
+function __lt.ig(method)
+	return method == "FindFirstChild"
+		or method == "WaitForChild"
+		or method == "FindFirstChildOfClass"
+		or method == "FindFirstChildWhichIsA"
+		or method == "FindFirstAncestor"
+		or method == "FindFirstAncestorOfClass"
+		or method == "FindFirstAncestorWhichIsA"
+		or method == "GetChildren"
+		or method == "GetDescendants"
+		or method == "QueryDescendants";
+end;
+function __lt.cm(name, method, ...)
+	local service = __lt.ig(method)
+		and __lt.cs(name, __lt.cr)
+		or game:GetService(name);
+	local fn = service[method];
 	if type(fn) ~= "function" then
-		error(string.format("Service method %s.%s is not callable", tostring(name), tostring(method)))
-	end
-	return fn(service, ...)
-end
+		error(string.format("Service method %s.%s is not callable", tostring(name), tostring(method)));
+	end;
+	return fn(service, ...);
+end;
 
 
 if not game:IsLoaded() then
@@ -172,13 +186,13 @@ if SplashIndex == 15 then
 	SplashText = "officilly bypassed lmao"
 end
 
-local Client = __lt_clone_service("Players", cloneref).LocalPlayer
+local Client = __lt.cs("Players", cloneref).LocalPlayer
 local PlayerGui = Client.PlayerGui
-local UserInputService = __lt_clone_service("UserInputService", cloneref)
-local HttpService = __lt_clone_service("HttpService", cloneref)
-local MarketplaceService = __lt_clone_service("MarketplaceService", cloneref)
-local ReplicatedStorage = __lt_clone_service("ReplicatedStorage", cloneref)
-local RunService = __lt_clone_service("RunService", cloneref)
+local UserInputService = __lt.cs("UserInputService", cloneref)
+local HttpService = __lt.cs("HttpService", cloneref)
+local MarketplaceService = __lt.cs("MarketplaceService", cloneref)
+local ReplicatedStorage = __lt.cs("ReplicatedStorage", cloneref)
+local RunService = __lt.cs("RunService", cloneref)
 
 local function testKeyAPI()
 	if IsSolaraOrXeno then
@@ -187,7 +201,7 @@ local function testKeyAPI()
 	if typeof(keypress) ~= "function" or typeof(keyrelease) ~= "function" then
 		return false
 	end
-	if __lt_call_service_method("UserInputService", "IsKeyDown", Enum.KeyCode.RightAlt) then
+	if __lt.cm("UserInputService", "IsKeyDown", Enum.KeyCode.RightAlt) then
 		return false
 	end
 	local st = 0
@@ -269,7 +283,7 @@ local function getVIM()
 	if vim then
 		return vim
 	end
-	vim = __lt_clone_service("VirtualInputManager", cloneref)
+	vim = __lt.cs("VirtualInputManager", cloneref)
 	return vim
 end
 
@@ -335,12 +349,12 @@ local function toVK(code)
 	return nil
 end
 
-local RE = __lt_call_service_method("ReplicatedStorage", "WaitForChild", "Modules"):WaitForChild("Network"):WaitForChild("RE")
-local RF = __lt_call_service_method("ReplicatedStorage", "WaitForChild", "Modules"):WaitForChild("Network"):WaitForChild("RF")
+local RE = __lt.cm("ReplicatedStorage", "WaitForChild", "Modules"):WaitForChild("Network"):WaitForChild("RE")
+local RF = __lt.cm("ReplicatedStorage", "WaitForChild", "Modules"):WaitForChild("Network"):WaitForChild("RF")
 local TakeDamageRemote
 
 local IsOnMobile = (function()
-	local p = __lt_call_service_method("UserInputService", "GetPlatform")
+	local p = __lt.cm("UserInputService", "GetPlatform")
 	if p == Enum.Platform.IOS or p == Enum.Platform.Android or p == Enum.Platform.AndroidTV or p == Enum.Platform.Chromecast or p == Enum.Platform.MetaOS then
 		return true
 	end
@@ -351,7 +365,7 @@ local IsOnMobile = (function()
 end)()
 
 local IsOnPC = (function()
-	local p = __lt_call_service_method("UserInputService", "GetPlatform")
+	local p = __lt.cm("UserInputService", "GetPlatform")
 	if p == Enum.Platform.Windows or p == Enum.Platform.OSX or p == Enum.Platform.Linux or p == Enum.Platform.SteamOS or p == Enum.Platform.UWP or p == Enum.Platform.DOS or p == Enum.Platform.BeOS then
 		return true
 	end
@@ -647,7 +661,7 @@ initModState()
 
 local function pname()
 	local ok, info = pcall(MarketplaceService.GetProductInfo, MarketplaceService, game.PlaceId)
-	return ok and info and info.Name or __lt_call_service_method("MarketplaceService", "GetProductInfo", game.PlaceId).Name
+	return ok and info and info.Name or __lt.cm("MarketplaceService", "GetProductInfo", game.PlaceId).Name
 end
 
 local function picon()
@@ -678,7 +692,7 @@ local function rpc(details, state, largeId, largeHover, smallId, smallHover)
 			hoverText = tostring(smallHover or "")
 		}
 	end
-	print("[BloxstrapRPC] " .. __lt_call_service_method("HttpService", "JSONEncode", {
+	print("[BloxstrapRPC] " .. __lt.cm("HttpService", "JSONEncode", {
 		command = "SetRichPresence",
 		data = data
 	}))
