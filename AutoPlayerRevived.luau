@@ -1,3 +1,35 @@
+local __lt_oldcloneref = type(cloneref) == "function" and cloneref or nil
+local function __lt_clone_service_value(value)
+	if __lt_oldcloneref and typeof(value) == "Instance" then
+		local ok, cloned = pcall(__lt_oldcloneref, value)
+		if ok and cloned ~= nil then
+			return cloned
+		end
+	end
+	return value
+end
+local function __lt_clone_service(name, refFn)
+	if type(refFn) ~= "function" then
+		return game:GetService(name)
+	end
+	local ok, ref = pcall(function()
+		return refFn(game:GetService(name))
+	end)
+	if ok and ref ~= nil then
+		return ref
+	end
+	return game:GetService(name)
+end
+local function __lt_call_service_method(name, method, ...)
+	local service = game:GetService(name)
+	local fn = service[method]
+	if type(fn) ~= "function" then
+		error(string.format("Service method %s.%s is not callable", tostring(name), tostring(method)))
+	end
+	return fn(service, ...)
+end
+
+
 if not game:IsLoaded() then
 	game.Loaded:Wait()
 end
@@ -140,13 +172,13 @@ if SplashIndex == 15 then
 	SplashText = "officilly bypassed lmao"
 end
 
-local Client = cloneref(game:GetService("Players")).LocalPlayer
+local Client = __lt_clone_service("Players", cloneref).LocalPlayer
 local PlayerGui = Client.PlayerGui
-local UserInputService = cloneref(game:GetService("UserInputService"))
-local HttpService = cloneref(game:GetService("HttpService"))
-local MarketplaceService = cloneref(game:GetService("MarketplaceService"))
-local ReplicatedStorage = cloneref(game:GetService("ReplicatedStorage"))
-local RunService = cloneref(game:GetService("RunService"))
+local UserInputService = __lt_clone_service("UserInputService", cloneref)
+local HttpService = __lt_clone_service("HttpService", cloneref)
+local MarketplaceService = __lt_clone_service("MarketplaceService", cloneref)
+local ReplicatedStorage = __lt_clone_service("ReplicatedStorage", cloneref)
+local RunService = __lt_clone_service("RunService", cloneref)
 
 local function testKeyAPI()
 	if IsSolaraOrXeno then
@@ -155,7 +187,7 @@ local function testKeyAPI()
 	if typeof(keypress) ~= "function" or typeof(keyrelease) ~= "function" then
 		return false
 	end
-	if UserInputService:IsKeyDown(Enum.KeyCode.RightAlt) then
+	if __lt_call_service_method("UserInputService", "IsKeyDown", Enum.KeyCode.RightAlt) then
 		return false
 	end
 	local st = 0
@@ -237,12 +269,8 @@ local function getVIM()
 	if vim then
 		return vim
 	end
-	local ok, svc = pcall(game.GetService, game, "VirtualInputManager")
-	if ok and svc then
-		vim = svc
-		return svc
-	end
-	return nil
+	vim = __lt_clone_service("VirtualInputManager", cloneref)
+	return vim
 end
 
 local vkMap = {
@@ -307,12 +335,12 @@ local function toVK(code)
 	return nil
 end
 
-local RE = ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Network"):WaitForChild("RE")
-local RF = ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Network"):WaitForChild("RF")
+local RE = __lt_call_service_method("ReplicatedStorage", "WaitForChild", "Modules"):WaitForChild("Network"):WaitForChild("RE")
+local RF = __lt_call_service_method("ReplicatedStorage", "WaitForChild", "Modules"):WaitForChild("Network"):WaitForChild("RF")
 local TakeDamageRemote
 
 local IsOnMobile = (function()
-	local p = UserInputService:GetPlatform()
+	local p = __lt_call_service_method("UserInputService", "GetPlatform")
 	if p == Enum.Platform.IOS or p == Enum.Platform.Android or p == Enum.Platform.AndroidTV or p == Enum.Platform.Chromecast or p == Enum.Platform.MetaOS then
 		return true
 	end
@@ -323,7 +351,7 @@ local IsOnMobile = (function()
 end)()
 
 local IsOnPC = (function()
-	local p = UserInputService:GetPlatform()
+	local p = __lt_call_service_method("UserInputService", "GetPlatform")
 	if p == Enum.Platform.Windows or p == Enum.Platform.OSX or p == Enum.Platform.Linux or p == Enum.Platform.SteamOS or p == Enum.Platform.UWP or p == Enum.Platform.DOS or p == Enum.Platform.BeOS then
 		return true
 	end
@@ -619,7 +647,7 @@ initModState()
 
 local function pname()
 	local ok, info = pcall(MarketplaceService.GetProductInfo, MarketplaceService, game.PlaceId)
-	return ok and info and info.Name or MarketplaceService:GetProductInfo(game.PlaceId).Name
+	return ok and info and info.Name or __lt_call_service_method("MarketplaceService", "GetProductInfo", game.PlaceId).Name
 end
 
 local function picon()
@@ -650,7 +678,7 @@ local function rpc(details, state, largeId, largeHover, smallId, smallHover)
 			hoverText = tostring(smallHover or "")
 		}
 	end
-	print("[BloxstrapRPC] " .. HttpService:JSONEncode({
+	print("[BloxstrapRPC] " .. __lt_call_service_method("HttpService", "JSONEncode", {
 		command = "SetRichPresence",
 		data = data
 	}))
@@ -947,9 +975,35 @@ local function actorKey(op, keyCode)
 		local useKeyAPI = %s and typeof(kpress) == "function" and typeof(krelease) == "function"
 		local vim
 		if not useKeyAPI then
-			local ok, svc = pcall(game.GetService, game, "VirtualInputManager")
+			local cref = type(cloneref) == "function" and cloneref or nil
+			local live = game:GetService("VirtualInputManager")
+			local ok, svc = cref and pcall(function()
+				return cref(game:GetService("VirtualInputManager"))
+			end)
 			if ok and svc then
-				vim = svc
+				vim = setmetatable({}, {
+					__index = function(_, key)
+						local current = game:GetService("VirtualInputManager")
+						local value = current[key]
+						if type(value) == "function" then
+							return function(_, ...)
+								return value(current, ...)
+							end
+						end
+						if cref and typeof(value) == "Instance" then
+							local ok2, cloned = pcall(cref, value)
+							if ok2 and cloned ~= nil then
+								return cloned
+							end
+						end
+						return value
+					end,
+					__newindex = function(_, key, value)
+						game:GetService("VirtualInputManager")[key] = value
+					end
+				})
+			else
+				vim = live
 			end
 		end
 		local isDown = %s
@@ -967,9 +1021,35 @@ local function actorKey(op, keyCode)
 			end
 		end
 		if not vim then
-			local ok, svc = pcall(game.GetService, game, "VirtualInputManager")
+			local cref = type(cloneref) == "function" and cloneref or nil
+			local live = game:GetService("VirtualInputManager")
+			local ok, svc = cref and pcall(function()
+				return cref(game:GetService("VirtualInputManager"))
+			end)
 			if ok and svc then
-				vim = svc
+				vim = setmetatable({}, {
+					__index = function(_, key)
+						local current = game:GetService("VirtualInputManager")
+						local value = current[key]
+						if type(value) == "function" then
+							return function(_, ...)
+								return value(current, ...)
+							end
+						end
+						if cref and typeof(value) == "Instance" then
+							local ok2, cloned = pcall(cref, value)
+							if ok2 and cloned ~= nil then
+								return cloned
+							end
+						end
+						return value
+					end,
+					__newindex = function(_, key, value)
+						game:GetService("VirtualInputManager")[key] = value
+					end
+				})
+			else
+				vim = live
 			end
 		end
 		if vim then
