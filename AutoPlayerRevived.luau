@@ -1,4 +1,58 @@
-local __lt = { cr = type(cloneref) == "function" and cloneref or nil };
+local __lt = {
+	cr = type(cloneref) == "function" and cloneref or nil;
+	svc = {
+		cache = {};
+		fallback = {};
+		invalid = {};
+	};
+};
+function __lt.sv(value)
+	return typeof(value) == "Instance";
+end;
+function __lt.fs(name)
+	local ok, service = pcall(function()
+		return game:FindService(name);
+	end);
+	if ok and __lt.sv(service) then
+		return service;
+	end;
+	return nil;
+end;
+function __lt.ns(name)
+	local ok, service = pcall(Instance.new, name);
+	if ok and __lt.sv(service) then
+		return service;
+	end;
+	return nil;
+end;
+function __lt.gs(name)
+	local cached = __lt.svc.cache[name];
+	local isFallback = __lt.svc.fallback[name] == true;
+	if __lt.sv(cached) and not isFallback then
+		return cached;
+	end;
+	local service = __lt.fs(name);
+	if __lt.sv(service) then
+		__lt.svc.invalid[name] = nil;
+		__lt.svc.cache[name] = service;
+		__lt.svc.fallback[name] = nil;
+		return service;
+	end;
+	if __lt.sv(cached) and isFallback then
+		return cached;
+	end;
+	if __lt.svc.invalid[name] then
+		return nil;
+	end;
+	service = __lt.ns(name);
+	if __lt.sv(service) then
+		__lt.svc.cache[name] = service;
+		__lt.svc.fallback[name] = true;
+		return service;
+	end;
+	__lt.svc.invalid[name] = true;
+	return nil;
+end;
 function __lt.cv(value)
 	if __lt.cr and typeof(value) == "Instance" then
 		local ok, cloned = pcall(__lt.cr, value);
@@ -10,15 +64,33 @@ function __lt.cv(value)
 end;
 function __lt.cs(name, refFn)
 	if type(refFn) ~= "function" then
-		return game:GetService(name);
+		return __lt.gs(name);
 	end;
 	local ok, ref = pcall(function()
-		return refFn(game:GetService(name));
+		return refFn(game:FindService(name));
 	end);
-	if ok and ref ~= nil then
+	if ok and __lt.sv(ref) then
 		return ref;
 	end;
-	return game:GetService(name);
+	local service = __lt.fs(name);
+	if __lt.sv(service) then
+		return service;
+	end;
+	if __lt.svc.invalid[name] then
+		return nil;
+	end;
+	local fallbackOk, fallbackRef = pcall(function()
+		return refFn(Instance.new(name));
+	end);
+	if fallbackOk and __lt.sv(fallbackRef) then
+		return fallbackRef;
+	end;
+	service = __lt.ns(name);
+	if __lt.sv(service) then
+		return service;
+	end;
+	__lt.svc.invalid[name] = true;
+	return nil;
 end;
 function __lt.ig(method)
 	return method == "FindFirstChild"
@@ -33,16 +105,16 @@ function __lt.ig(method)
 		or method == "QueryDescendants";
 end;
 function __lt.cm(name, method, ...)
-	local service = __lt.ig(method)
-		and __lt.cs(name, __lt.cr)
-		or game:GetService(name);
+	local service = __lt.cs(name, __lt.cr);
+	if not __lt.sv(service) then
+		error(string.format("Service %s could not be resolved", tostring(name)));
+	end;
 	local fn = service[method];
 	if type(fn) ~= "function" then
 		error(string.format("Service method %s.%s is not callable", tostring(name), tostring(method)));
 	end;
 	return fn(service, ...);
 end;
-
 
 if not game:IsLoaded() then
 	game.Loaded:Wait()
@@ -990,14 +1062,14 @@ local function actorKey(op, keyCode)
 		local vim
 		if not useKeyAPI then
 			local cref = type(cloneref) == "function" and cloneref or nil
-			local live = game:GetService("VirtualInputManager")
+			local live = __lt.gs("VirtualInputManager")
 			local ok, svc = cref and pcall(function()
-				return cref(game:GetService("VirtualInputManager"))
+				return __lt.cs("VirtualInputManager", cref)
 			end)
 			if ok and svc then
 				vim = setmetatable({}, {
 					__index = function(_, key)
-						local current = game:GetService("VirtualInputManager")
+						local current = __lt.gs("VirtualInputManager")
 						local value = current[key]
 						if type(value) == "function" then
 							return function(_, ...)
@@ -1013,7 +1085,7 @@ local function actorKey(op, keyCode)
 						return value
 					end,
 					__newindex = function(_, key, value)
-						game:GetService("VirtualInputManager")[key] = value
+						__lt.gs("VirtualInputManager")[key] = value
 					end
 				})
 			else
@@ -1036,14 +1108,14 @@ local function actorKey(op, keyCode)
 		end
 		if not vim then
 			local cref = type(cloneref) == "function" and cloneref or nil
-			local live = game:GetService("VirtualInputManager")
+			local live = __lt.gs("VirtualInputManager")
 			local ok, svc = cref and pcall(function()
-				return cref(game:GetService("VirtualInputManager"))
+				return __lt.cs("VirtualInputManager", cref)
 			end)
 			if ok and svc then
 				vim = setmetatable({}, {
 					__index = function(_, key)
-						local current = game:GetService("VirtualInputManager")
+						local current = __lt.gs("VirtualInputManager")
 						local value = current[key]
 						if type(value) == "function" then
 							return function(_, ...)
@@ -1059,7 +1131,7 @@ local function actorKey(op, keyCode)
 						return value
 					end,
 					__newindex = function(_, key, value)
-						game:GetService("VirtualInputManager")[key] = value
+						__lt.gs("VirtualInputManager")[key] = value
 					end
 				})
 			else
