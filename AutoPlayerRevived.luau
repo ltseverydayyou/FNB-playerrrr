@@ -136,55 +136,6 @@ end
 
 local ExecutorName = executorName()
 local ExecutorNameLower = string.lower(ExecutorName)
-local IsSolaraOrXeno = ExecutorNameLower == "solara" or ExecutorNameLower == "xeno"
-
-if IsSolaraOrXeno and typeof(getfenv) == "function" then
-	local realGame = game
-	local oldFindService = realGame.FindService
-	local oldGetService = realGame.GetService
-	local env = getfenv()
-
-	if type(env) == "table" and type(oldFindService) == "function" and type(oldGetService) == "function" then
-		env.game = setmetatable({}, {
-			__index = function(_, key)
-				if key == "FindService" or key == "findService" then
-					return function(self, serviceName)
-						local callerSafe = typeof(checkcaller) == "function" and checkcaller()
-						if not callerSafe and serviceName == "VirtualInputManager" then
-							return nil
-						end
-						return oldFindService(realGame, serviceName)
-					end
-				elseif key == "GetService" or key == "getService" then
-					return function(self, serviceName)
-						local callerSafe = typeof(checkcaller) == "function" and checkcaller()
-						if not callerSafe and serviceName == "VirtualInputManager" then
-							return nil
-						end
-						return oldGetService(realGame, serviceName)
-					end
-				end
-				return realGame[key]
-			end,
-			__tostring = function()
-				return "game"
-			end
-		})
-
-		env.u21 = {
-			IsStudio = function()
-				return true
-			end
-		}
-
-		if typeof(getgenv) == "function" then
-			local ok, genv = pcall(getgenv)
-			if ok and type(genv) == "table" then
-				genv.u21 = env.u21
-			end
-		end
-	end
-end
 
 local connections = {
 	_list = {},
@@ -265,164 +216,10 @@ local HttpService = __lt.cs("HttpService", cloneref)
 local MarketplaceService = __lt.cs("MarketplaceService", cloneref)
 local ReplicatedStorage = __lt.cs("ReplicatedStorage", cloneref)
 local RunService = __lt.cs("RunService", cloneref)
+local VirtualInputManager = __lt.cs("VirtualInputManager", cloneref)
 
-local function testKeyAPI()
-	if IsSolaraOrXeno then
-		return false
-	end
-	if typeof(keypress) ~= "function" or typeof(keyrelease) ~= "function" then
-		return false
-	end
-	if __lt.cm("UserInputService", "IsKeyDown", Enum.KeyCode.RightAlt) then
-		return false
-	end
-	local st = 0
-	local bad = false
-	local conA
-	local conB
-	local function stopTest()
-		if conA then
-			conA:Disconnect()
-			conA = nil
-		end
-		if conB then
-			conB:Disconnect()
-			conB = nil
-		end
-	end
-	conA = UserInputService.InputBegan:Connect(function(io, gpe)
-		if gpe then
-			return
-		end
-		if io.KeyCode == Enum.KeyCode.RightAlt then
-			if st ~= 1 then
-				bad = true
-				stopTest()
-				return
-			end
-			st = 2
-		end
-	end)
-	conB = UserInputService.InputEnded:Connect(function(io, gpe)
-		if gpe then
-			return
-		end
-		if io.KeyCode == Enum.KeyCode.RightAlt then
-			if st ~= 2 then
-				bad = true
-				stopTest()
-				return
-			end
-			st = 3
-		end
-	end)
-	st = 1
-	local okD = pcall(keypress, 0xA5)
-	if not okD then
-		stopTest()
-		return false
-	end
-	local t0 = tick()
-	while (not bad) and st < 2 and tick() - t0 < 0.12 do
-		task.wait()
-	end
-	if bad or st < 2 then
-		pcall(keyrelease, 0xA5)
-		stopTest()
-		return false
-	end
-	local okU = pcall(keyrelease, 0xA5)
-	if not okU then
-		stopTest()
-		return false
-	end
-	local t1 = tick()
-	while (not bad) and st < 3 and tick() - t1 < 0.12 do
-		task.wait()
-	end
-	stopTest()
-	return (not bad) and st == 3
-end
-
-local hasKeyAPI = testKeyAPI()
-local KeyMode = hasKeyAPI and "API" or "VIM"
-local function useKeyAPI()
-	return hasKeyAPI and KeyMode == "API"
-end
-
-local vim
-local function getVIM()
-	if vim then
-		return vim
-	end
-	vim = __lt.cs("VirtualInputManager", cloneref)
-	return vim
-end
-
-local vkMap = {
-	Space = 0x20,
-	Left = 0x25,
-	Up = 0x26,
-	Right = 0x27,
-	Down = 0x28,
-
-	Semicolon = 0xBA,
-	Equals = 0xBB,
-	Comma = 0xBC,
-	Minus = 0xBD,
-	Period = 0xBE,
-	Slash = 0xBF,
-	Backquote = 0xC0,
-	LeftBracket = 0xDB,
-	Backslash = 0xDC,
-	RightBracket = 0xDD,
-	Quote = 0xDE,
-
-	LeftShift = 0xA0,
-	RightShift = 0xA1,
-	LeftControl = 0xA2,
-	RightControl = 0xA3,
-	LeftAlt = 0xA4,
-	RightAlt = 0xA5
-}
-
-local numMap = {
-	Zero = 0x30,
-	One = 0x31,
-	Two = 0x32,
-	Three = 0x33,
-	Four = 0x34,
-	Five = 0x35,
-	Six = 0x36,
-	Seven = 0x37,
-	Eight = 0x38,
-	Nine = 0x39
-}
-
-local function toVK(code)
-	if not code or typeof(code) ~= "EnumItem" then
-		return nil
-	end
-	local name = code.Name
-	local v = vkMap[name]
-	if v then
-		return v
-	end
-	local n = numMap[name]
-	if n then
-		return n
-	end
-	if #name == 1 then
-		local b = string.byte(name)
-		if b >= 65 and b <= 90 then
-			return b
-		end
-	end
-	return nil
-end
-
-local RE = __lt.cm("ReplicatedStorage", "WaitForChild", "Modules"):WaitForChild("Network"):WaitForChild("RE")
-local RF = __lt.cm("ReplicatedStorage", "WaitForChild", "Modules"):WaitForChild("Network"):WaitForChild("RF")
+local RE = ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Network"):WaitForChild("RE")
+local RF = ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Network"):WaitForChild("RF")
 local TakeDamageRemote
 
 local IsOnMobile = (function()
@@ -764,7 +561,7 @@ local function rpc(details, state, largeId, largeHover, smallId, smallHover)
 			hoverText = tostring(smallHover or "")
 		}
 	end
-	print("[BloxstrapRPC] " .. __lt.cm("HttpService", "JSONEncode", {
+	print("[BloxstrapRPC] " .. HttpService:JSONEncode({
 		command = "SetRichPresence",
 		data = data
 	}))
@@ -1039,11 +836,6 @@ local function actorKey(op, keyCode)
 		return false
 	end
 
-	local vk = toVK(keyCode)
-	if not vk then
-		return false
-	end
-
 	local actorsAPI = typeof(getactors) == "function" and typeof(run_on_actor) == "function"
 	if not actorsAPI then
 		return false
@@ -1055,93 +847,44 @@ local function actorKey(op, keyCode)
 	end
 
 	local down = op == "press"
-	local useAPI = useKeyAPI()
 	local src = string.format([[
-		local kpress, krelease = keypress, keyrelease
-		local useKeyAPI = %s and typeof(kpress) == "function" and typeof(krelease) == "function"
 		local vim
-		if not useKeyAPI then
-			local cref = type(cloneref) == "function" and cloneref or nil
-			local live = __lt.gs("VirtualInputManager")
-			local ok, svc = cref and pcall(function()
-				return __lt.cs("VirtualInputManager", cref)
-			end)
-			if ok and svc then
-				vim = setmetatable({}, {
-					__index = function(_, key)
-						local current = __lt.gs("VirtualInputManager")
-						local value = current[key]
-						if type(value) == "function" then
-							return function(_, ...)
-								return value(current, ...)
-							end
-						end
-						if cref and typeof(value) == "Instance" then
-							local ok2, cloned = pcall(cref, value)
-							if ok2 and cloned ~= nil then
-								return cloned
-							end
-						end
-						return value
-					end,
-					__newindex = function(_, key, value)
-						__lt.gs("VirtualInputManager")[key] = value
-					end
-				})
-			else
-				vim = live
-			end
-		end
 		local isDown = %s
 		local kc = Enum.KeyCode[%q]
-		local vk = %d
-		if useKeyAPI then
-			local ok
-			if isDown then
-				ok = pcall(kpress, vk)
-			else
-				ok = pcall(krelease, vk)
-			end
-			if ok then
-				return
-			end
-		end
-		if not vim then
-			local cref = type(cloneref) == "function" and cloneref or nil
-			local live = __lt.gs("VirtualInputManager")
-			local ok, svc = cref and pcall(function()
-				return __lt.cs("VirtualInputManager", cref)
-			end)
-			if ok and svc then
-				vim = setmetatable({}, {
-					__index = function(_, key)
-						local current = __lt.gs("VirtualInputManager")
-						local value = current[key]
-						if type(value) == "function" then
-							return function(_, ...)
-								return value(current, ...)
-							end
+		local cref = type(cloneref) == "function" and cloneref or nil
+		local live = __lt.gs("VirtualInputManager")
+		local ok, svc = cref and pcall(function()
+			return __lt.cs("VirtualInputManager", cref)
+		end)
+		if ok and svc then
+			vim = setmetatable({}, {
+				__index = function(_, key)
+					local current = __lt.gs("VirtualInputManager")
+					local value = current[key]
+					if type(value) == "function" then
+						return function(_, ...)
+							return value(current, ...)
 						end
-						if cref and typeof(value) == "Instance" then
-							local ok2, cloned = pcall(cref, value)
-							if ok2 and cloned ~= nil then
-								return cloned
-							end
-						end
-						return value
-					end,
-					__newindex = function(_, key, value)
-						__lt.gs("VirtualInputManager")[key] = value
 					end
-				})
-			else
-				vim = live
-			end
+					if cref and typeof(value) == "Instance" then
+						local ok2, cloned = pcall(cref, value)
+						if ok2 and cloned ~= nil then
+							return cloned
+						end
+					end
+					return value
+				end,
+				__newindex = function(_, key, value)
+					__lt.gs("VirtualInputManager")[key] = value
+				end
+			})
+		else
+			vim = live
 		end
 		if vim then
 			vim:SendKeyEvent(isDown, kc, false, nil)
 		end
-	]], useAPI and "true" or "false", down and "true" or "false", keyCode.Name, vk)
+	]], down and "true" or "false", keyCode.Name)
 
 	pcall(run_on_actor, actors[1], src)
 	return true
@@ -1234,7 +977,6 @@ local brpcToggle
 local cursorToggle
 local antiMissToggle
 local inputModeDropdown
-local keyModeDropdown
 
 local function doSolo(singleplayerUI)
 	local sp = singleplayerUI or PlayerGui:FindFirstChild("SingleplayerUI")
@@ -1521,24 +1263,6 @@ inputModeDropdown = MainControls:AddDropdown("InputMode", {
 		InputMode = sel
 	end
 })
-
-if hasKeyAPI then
-	keyModeDropdown = MainControls:AddDropdown("KeyMode", {
-		Text = "Keyboard backend",
-		Values = {
-			"API",
-			"VIM"
-		},
-		Default = KeyMode,
-		Callback = function(opt)
-			local sel = typeof(opt) == "table" and opt[1] or opt or "VIM"
-			if sel ~= "API" and sel ~= "VIM" then
-				sel = "VIM"
-			end
-			KeyMode = sel
-		end
-	})
-end
 
 MainControls:AddLabel("if firesignal doesn't work\nswitch to Virtual Input")
 
@@ -2031,23 +1755,8 @@ onChildAdded = function(Object)
 		if not keyCode then
 			return
 		end
-		if useKeyAPI() then
-			local vk = toVK(keyCode)
-			if vk then
-				local ok
-				if isDown then
-					ok = pcall(keypress, vk)
-				else
-					ok = pcall(keyrelease, vk)
-				end
-				if ok then
-					return
-				end
-			end
-		end
-		local v = getVIM()
-		if v then
-			v:SendKeyEvent(isDown, keyCode, false, nil)
+		if VirtualInputManager then
+			VirtualInputManager:SendKeyEvent(isDown, keyCode, false, nil)
 		end
 	end
 
@@ -2122,24 +1831,6 @@ onChildAdded = function(Object)
 		local newValue = clampSpeed(Input.ScrollSpeed.Value)
 		syncSlider(newValue)
 	end)
-
-	if IsSolaraOrXeno then
-		local otherSideValue = sideValue == "L" and "R" or "L"
-		local otherSideFolder = Object.Engine.Game:FindFirstChild(otherSideValue)
-		local otherArrows = otherSideFolder and otherSideFolder:FindFirstChild("Arrows")
-		local otherIncoming = otherArrows and otherArrows:FindFirstChild("IncomingNotes")
-		if otherIncoming then
-			for _, otherHolder in pairs(otherIncoming:GetChildren()) do
-				connections:add(otherHolder.ChildAdded, function(otherArrow)
-					task.defer(function()
-						if otherArrow and otherArrow.Parent then
-							otherArrow:Destroy()
-						end
-					end)
-				end)
-			end
-		end
-	end
 
 	for _, Holder in pairs(IncomingNotes) do
 		connections:add(Holder.ChildAdded, function(Arrow)
