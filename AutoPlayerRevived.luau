@@ -33,20 +33,6 @@ if game.GameId ~= 2953945619 then
 	return
 end
 
-local function executorName()
-	if typeof(identifyexecutor) ~= "function" then
-		return ""
-	end
-	local ok, name = pcall(identifyexecutor)
-	if ok and type(name) == "string" then
-		return name
-	end
-	return ""
-end
-
-local ExecutorName = executorName()
-local ExecutorNameLower = string.lower(ExecutorName)
-
 local connections = {
 	_list = {},
 	add = function(self, s, cb)
@@ -121,16 +107,17 @@ end
 
 local Client = __lt.cs("Players", cloneref).LocalPlayer
 local PlayerGui = Client.PlayerGui
-local UserInputService = __lt.cs("UserInputService", cloneref)
-local HttpService = __lt.cs("HttpService", cloneref)
-local MarketplaceService = __lt.cs("MarketplaceService", cloneref)
-local ReplicatedStorage = __lt.cs("ReplicatedStorage", cloneref)
-local RunService = __lt.cs("RunService", cloneref)
-local VirtualInputManager = __lt.cs("VirtualInputManager", cloneref)
+local svc = {
+	ui = __lt.cs("UserInputService", cloneref),
+	http = __lt.cs("HttpService", cloneref),
+	mps = __lt.cs("MarketplaceService", cloneref),
+	rs = __lt.cs("ReplicatedStorage", cloneref),
+	run = __lt.cs("RunService", cloneref),
+	vim = __lt.cs("VirtualInputManager", cloneref)
+}
 
-local RE = ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Network"):WaitForChild("RE")
-local RF = ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Network"):WaitForChild("RF")
-local TakeDamageRemote
+local RE = svc.rs:WaitForChild("Modules"):WaitForChild("Network"):WaitForChild("RE")
+local RF = svc.rs:WaitForChild("Modules"):WaitForChild("Network"):WaitForChild("RF")
 
 local IsOnMobile = (function()
 	local p = __lt.cm("UserInputService", "GetPlatform")
@@ -138,18 +125,7 @@ local IsOnMobile = (function()
 		return true
 	end
 	if p == Enum.Platform.None then
-		return UserInputService.TouchEnabled and not (UserInputService.KeyboardEnabled or UserInputService.MouseEnabled)
-	end
-	return false
-end)()
-
-local IsOnPC = (function()
-	local p = __lt.cm("UserInputService", "GetPlatform")
-	if p == Enum.Platform.Windows or p == Enum.Platform.OSX or p == Enum.Platform.Linux or p == Enum.Platform.SteamOS or p == Enum.Platform.UWP or p == Enum.Platform.DOS or p == Enum.Platform.BeOS then
-		return true
-	end
-	if p == Enum.Platform.None then
-		return UserInputService.KeyboardEnabled or UserInputService.MouseEnabled
+		return svc.ui.TouchEnabled and not (svc.ui.KeyboardEnabled or svc.ui.MouseEnabled)
 	end
 	return false
 end)()
@@ -157,7 +133,7 @@ end)()
 local Input = Client:WaitForChild("Input")
 local Keybinds = Input.Keybinds
 
-local function loadRemoteChunk(url, label)
+local function loadChunk(url, label)
 	if typeof(loadstring) ~= "function" then
 		warn(string.format("[FNB] Skipping %s (loadstring unavailable)", tostring(label)))
 		return nil
@@ -182,8 +158,7 @@ local function loadRemoteChunk(url, label)
 	return result
 end
 
-loadRemoteChunk("https://raw.githubusercontent.com/ltseverydayyou/FNB-playerrrr/refs/heads/main/uselessAhh.luau", "uselessAhh.luau")
-local Offsets = loadRemoteChunk("https://raw.githubusercontent.com/ltseverydayyou/FNB-playerrrr/refs/heads/main/speedManager.lua", "speedManager.lua")
+local Offsets = loadChunk("https://raw.githubusercontent.com/ltseverydayyou/FNB-playerrrr/refs/heads/main/speedManager.lua", "speedManager.lua")
 if type(Offsets) ~= "table" then
 	Offsets = {}
 end
@@ -256,7 +231,7 @@ end
 local defSpeed = clampSpeed(Input and Input.ScrollSpeed and tonumber(Input.ScrollSpeed.Value) or 1)
 local curSpeed = defSpeed
 
-local RPCDetailsPrefix = ""
+local rpcDet = ""
 local RPCStatePrefix = ""
 local RPCSidePrefix = "Side: "
 
@@ -278,11 +253,7 @@ local function notify(title, description, time)
 	})
 end
 
-local function asset(id)
-	return string.format("rbxassetid://%d", id)
-end
-
-local function formatWithPrefix(prefix, text)
+local function fmtPre(prefix, text)
 	local prefixText = tostring(prefix or "")
 	local content = tostring(text or "")
 	if prefixText ~= "" then
@@ -304,18 +275,25 @@ local TabSettings = Window:AddTab({
 	Icon = "settings"
 })
 
-local AutoEnabled = true
-local OffsetMs = 0
-local ReleaseAllActiveLanes = function() end
-local onChildAdded
-local regGuiListeners
-local HideMobileBtns = true
-local BRPCEnabled = true
-local Mode = "normal"
-local AntiMissEnabled = false
-local InputMode = "firesignal"
+local st = {
+	auto = true,
+	off = 0,
+	rel = function() end,
+	onAdd = nil,
+	regUi = nil,
+	hideMb = true,
+	brpc = true,
+	mode = "normal",
+	aKick = true,
+	aMiss = false,
+	aDead = false,
+	inMode = "Virtual Input",
+	adHp = 1000000000,
+	adHum = nil,
+	adOrig = {}
+}
 if typeof(firesignal) ~= "function" then
-	InputMode = "Virtual Input"
+	st.inMode = "Virtual Input"
 end
 
 local gEnv
@@ -326,14 +304,14 @@ if typeof(getrenv) == "function" then
 	end
 end
 
-RunService.RenderStepped:Connect(function()
+svc.run.RenderStepped:Connect(function()
 	if not gEnv then
 		return
 	end
 	pcall(function()
 		local li = gEnv.LastInput
 		if li then
-			if InputMode == "firesignal" then
+			if st.inMode == "firesignal" then
 				li.Value = Enum.UserInputType.Touch
 			else
 				li.Value = Enum.UserInputType.Keyboard
@@ -419,15 +397,15 @@ local ModifierList = {
 	}
 }
 
-local AppliedModifierState = {}
+local modState = {}
 local ModApplyDelay = 0.5
-local applyModsToken = 0
-local modToggleTokens = {}
+local applyModsTok = 0
+local modTok = {}
 
 local function initModState()
 	for kind, names in pairs(ModifierList) do
-		AppliedModifierState[kind] = AppliedModifierState[kind] or {}
-		local bucket = AppliedModifierState[kind]
+		modState[kind] = modState[kind] or {}
+		local bucket = modState[kind]
 		for _, name in ipairs(names) do
 			if bucket[name] == nil then
 				bucket[name] = false
@@ -439,12 +417,12 @@ end
 initModState()
 
 local function pname()
-	local ok, info = pcall(MarketplaceService.GetProductInfo, MarketplaceService, game.PlaceId)
+	local ok, info = pcall(svc.mps.GetProductInfo, svc.mps, game.PlaceId)
 	return ok and info and info.Name or __lt.cm("MarketplaceService", "GetProductInfo", game.PlaceId).Name
 end
 
 local function picon()
-	local ok, info = pcall(MarketplaceService.GetProductInfo, MarketplaceService, game.PlaceId)
+	local ok, info = pcall(svc.mps.GetProductInfo, svc.mps, game.PlaceId)
 	if ok and info and info.IconImageAssetId and info.IconImageAssetId ~= 0 then
 		return info.IconImageAssetId
 	end
@@ -452,11 +430,11 @@ local function picon()
 end
 
 local function rpc(details, state, largeId, largeHover, smallId, smallHover)
-	if not BRPCEnabled then
+	if not st.brpc then
 		return
 	end
-	local detailsText = formatWithPrefix(RPCDetailsPrefix, details)
-	local stateText = formatWithPrefix(RPCStatePrefix, state)
+	local detailsText = fmtPre(rpcDet, details)
+	local stateText = fmtPre(RPCStatePrefix, state)
 	local data = {
 		details = detailsText,
 		state = stateText,
@@ -471,7 +449,7 @@ local function rpc(details, state, largeId, largeHover, smallId, smallHover)
 			hoverText = tostring(smallHover or "")
 		}
 	end
-	print("[BloxstrapRPC] " .. HttpService:JSONEncode({
+	print("[BloxstrapRPC] " .. svc.http:JSONEncode({
 		command = "SetRichPresence",
 		data = data
 	}))
@@ -512,7 +490,7 @@ local function scan()
 		sid = d and tonumber(d) or nil
 	end
 	local sideVal = engine and engine:FindFirstChild("PlayerSide") and engine.PlayerSide.Value or "L"
-	local sh = formatWithPrefix(RPCSidePrefix, sideVal == "L" and "Left" or "Right")
+	local sh = fmtPre(RPCSidePrefix, sideVal == "L" and "Left" or "Right")
 	rpc(det, st, picon(), pname(), sid, sh)
 end
 
@@ -626,10 +604,10 @@ local function engineReady()
 end
 
 local function applyMod(kind, name, shouldEnable, force)
-	local stateBucket = AppliedModifierState[kind]
+	local stateBucket = modState[kind]
 	if not stateBucket then
 		stateBucket = {}
-		AppliedModifierState[kind] = stateBucket
+		modState[kind] = stateBucket
 	end
 	if stateBucket[name] == nil then
 		stateBucket[name] = false
@@ -658,23 +636,23 @@ end
 
 local function queueModApply(kind, name, shouldEnable)
 	local key = string.format("%s:%s", tostring(kind), tostring(name))
-	modToggleTokens[key] = (modToggleTokens[key] or 0) + 1
-	local token = modToggleTokens[key]
+	modTok[key] = (modTok[key] or 0) + 1
+	local token = modTok[key]
 	task.delay(ModApplyDelay, function()
-		if modToggleTokens[key] ~= token then
+		if modTok[key] ~= token then
 			return
 		end
-		modToggleTokens[key] = nil
+		modTok[key] = nil
 		applyMod(kind, name, shouldEnable, false)
 	end)
 end
 
 local function applyMods(force)
-	applyModsToken += 1
-	local token = applyModsToken
+	applyModsTok += 1
+	local token = applyModsTok
 	task.spawn(function()
 		task.wait(ModApplyDelay)
-		if token ~= applyModsToken then
+		if token ~= applyModsTok then
 			return
 		end
 		if not engineReady() then
@@ -682,7 +660,7 @@ local function applyMods(force)
 		end
 		for kind, names in pairs(ModifierList) do
 			local flags = AutoModFlags[kind]
-			local stateBucket = AppliedModifierState[kind]
+			local stateBucket = modState[kind]
 			for _, name in ipairs(names) do
 				local desired = false
 				if flags then
@@ -696,7 +674,7 @@ local function applyMods(force)
 	end)
 end
 
-local function computeBaseOffset(scrollSpeed)
+local function calcOff(scrollSpeed)
 	local key = string.format("%.1f", tonumber(scrollSpeed) or 1)
 	local ms = Offsets[key]
 	if ms == nil then
@@ -706,7 +684,7 @@ local function computeBaseOffset(scrollSpeed)
 	return ms / 1000 + 0.4
 end
 
-local function pressLaneMobile(container, name)
+local function pressMob(container, name)
 	if typeof(firesignal) ~= "function" then
 		return
 	end
@@ -722,7 +700,7 @@ local function pressLaneMobile(container, name)
 	end
 end
 
-local function releaseLaneMobile(container, name)
+local function relMob(container, name)
 	if typeof(firesignal) ~= "function" then
 		return
 	end
@@ -739,7 +717,7 @@ local function releaseLaneMobile(container, name)
 end
 
 local function actorKey(op, keyCode)
-	if Mode ~= "actor" then
+	if st.mode ~= "actor" then
 		return false
 	end
 	if not keyCode or typeof(keyCode) ~= "EnumItem" then
@@ -800,7 +778,7 @@ local function actorKey(op, keyCode)
 	return true
 end
 
-local function playNoteSequence(Holder, Arrow, keyCode, AutoCtx)
+local function playSeq(Holder, Arrow, keyCode, AutoCtx)
 	task.spawn(function()
 		local baseOffset = AutoCtx.baseOffset
 		task.wait(baseOffset + AutoCtx.offsetMs / 1000)
@@ -880,13 +858,14 @@ local AutoModsGroup = TabMain:AddRightGroupbox("Auto Modifiers")
 local tAuto
 local sSpd
 local sMs
-local hideMobileToggle
+local hideMobTg
 local soloToggle
 local modeDropdown
 local brpcToggle
 local cursorToggle
 local antiMissToggle
-local inputModeDropdown
+local deadTg
+local inModeDrop
 
 local function doSolo(singleplayerUI)
 	local sp = singleplayerUI or PlayerGui:FindFirstChild("SingleplayerUI")
@@ -924,13 +903,124 @@ local function watchSolo(enabled)
 	end
 end
 
+local function getHum()
+	local character = Client.Character
+	if not character then
+		return nil
+	end
+	return character:FindFirstChildOfClass("Humanoid")
+end
+
+local function snapAdHum(humanoid)
+	if not humanoid or not humanoid:IsA("Humanoid") then
+		return nil
+	end
+	local state = st.adOrig[humanoid]
+	if state then
+		return state
+	end
+	local okBreak, breakJointsOnDeath = pcall(function()
+		return humanoid.BreakJointsOnDeath
+	end)
+	state = {
+		maxHealth = humanoid.MaxHealth,
+		breakJointsOnDeath = okBreak and breakJointsOnDeath or nil
+	}
+	st.adOrig[humanoid] = state
+	return state
+end
+
+local function applyAd(humanoid)
+	if not st.aDead or not humanoid or not humanoid:IsA("Humanoid") or humanoid.Parent == nil then
+		return
+	end
+	st.adHum = humanoid
+	snapAdHum(humanoid)
+	if humanoid.MaxHealth < st.adHp then
+		pcall(function()
+			humanoid.MaxHealth = st.adHp
+		end)
+	end
+	if humanoid.Health < humanoid.MaxHealth then
+		pcall(function()
+			humanoid.Health = humanoid.MaxHealth
+		end)
+	end
+	pcall(function()
+		if humanoid.BreakJointsOnDeath ~= false then
+			humanoid.BreakJointsOnDeath = false
+		end
+	end)
+	pcall(function()
+		humanoid:SetStateEnabled(Enum.HumanoidStateType.Dead, false)
+	end)
+	pcall(function()
+		if humanoid:GetState() == Enum.HumanoidStateType.Dead then
+			humanoid:ChangeState(Enum.HumanoidStateType.Running)
+		end
+	end)
+end
+
+local function restAd(humanoid)
+	if not humanoid or not humanoid:IsA("Humanoid") then
+		return
+	end
+	local state = st.adOrig[humanoid]
+	if state then
+		pcall(function()
+			humanoid.MaxHealth = state.maxHealth or 100
+		end)
+		pcall(function()
+			if humanoid.Health > humanoid.MaxHealth then
+				humanoid.Health = humanoid.MaxHealth
+			end
+		end)
+		if state.breakJointsOnDeath ~= nil then
+			pcall(function()
+				humanoid.BreakJointsOnDeath = state.breakJointsOnDeath
+			end)
+		end
+		st.adOrig[humanoid] = nil
+	end
+	pcall(function()
+		humanoid:SetStateEnabled(Enum.HumanoidStateType.Dead, true)
+	end)
+	if st.adHum == humanoid then
+		st.adHum = nil
+	end
+end
+
+local function killTd(remote)
+	if not remote or remote.Parent == nil or remote.Name ~= "TakeDamage" then
+		return
+	end
+	pcall(function()
+		remote:Destroy()
+	end)
+end
+
+local function setAd(enabled)
+	st.aDead = enabled and true or false
+	if st.aDead then
+		applyAd(getHum())
+		return
+	end
+	local restoreList = {}
+	for humanoid in pairs(st.adOrig) do
+		restoreList[#restoreList + 1] = humanoid
+	end
+	for _, humanoid in ipairs(restoreList) do
+		restAd(humanoid)
+	end
+end
+
 tAuto = MainControls:AddToggle("AutoplayerToggle", {
 	Text = "Autoplayer",
 	Default = true,
 	Callback = function(v)
-		AutoEnabled = v
+		st.auto = v
 		if not v then
-			pcall(ReleaseAllActiveLanes)
+			pcall(st.rel)
 		end
 	end
 })
@@ -959,7 +1049,7 @@ if not IsOnMobile then
 	end)
 end
 
-local scrollSpeedUpdating = false
+local spdSync = false
 
 local function pushSpeed(value)
 	RE:FireServer("REMOTE_EVENT", {
@@ -975,12 +1065,12 @@ local function syncSlider(value)
 	if not sSpd then
 		return
 	end
-	scrollSpeedUpdating = true
+	spdSync = true
 	sSpd:SetValue(clamped)
-	scrollSpeedUpdating = false
+	spdSync = false
 end
 
-local function parseScrollSpeedText(text)
+local function parseSpd(text)
 	if type(text) ~= "string" then
 		return nil
 	end
@@ -991,11 +1081,11 @@ local function parseScrollSpeedText(text)
 	return tonumber(match)
 end
 
-local function syncSliderWithScrollSpeedButton(button)
-	if not button or scrollSpeedUpdating then
+local function syncBtn(button)
+	if not button or spdSync then
 		return
 	end
-	local parsed = parseScrollSpeedText(button.Text)
+	local parsed = parseSpd(button.Text)
 	if not parsed then
 		return
 	end
@@ -1006,7 +1096,7 @@ local function syncSliderWithScrollSpeedButton(button)
 	syncSlider(clamped)
 end
 
-local function detachScrollWatcher()
+local function dropSw()
 	if watchers.scrollBtn then
 		watchers.scrollBtn:Disconnect()
 		watchers.scrollBtn = nil
@@ -1017,8 +1107,8 @@ local function detachScrollWatcher()
 	end
 end
 
-local function attachScrollWatcher()
-	detachScrollWatcher()
+local function bindSw()
+	dropSw()
 	task.spawn(function()
 		local gui = PlayerGui:FindFirstChild("GameUI") or PlayerGui:WaitForChild("GameUI", 5)
 		if not gui then
@@ -1041,12 +1131,12 @@ local function attachScrollWatcher()
 			return
 		end
 		local function onTextChanged()
-			syncSliderWithScrollSpeedButton(button)
+			syncBtn(button)
 		end
 		watchers.scrollBtn = button:GetPropertyChangedSignal("Text"):Connect(onTextChanged)
 		watchers.scrollAnces = button.AncestryChanged:Connect(function(_, parent)
 			if not parent then
-				attachScrollWatcher()
+				bindSw()
 			end
 		end)
 		onTextChanged()
@@ -1087,15 +1177,15 @@ local function watchSongSel(gameUI)
 	if not gameUI then
 		return
 	end
-	local function onChildAdded(child)
+	local function onSong(child)
 		task.defer(function()
 			if child and child.Name == "SongSelect" then
 				bindSongVis(child)
 			end
 		end)
 	end
-	watchers.songChild = gameUI.ChildAdded:Connect(onChildAdded)
-	onChildAdded(gameUI:FindFirstChild("SongSelect"))
+	watchers.songChild = gameUI.ChildAdded:Connect(onSong)
+	onSong(gameUI:FindFirstChild("SongSelect"))
 end
 
 sSpd = MainControls:AddSlider("ScrollSpeed", {
@@ -1106,7 +1196,7 @@ sSpd = MainControls:AddSlider("ScrollSpeed", {
 	Rounding = 1,
 	Suffix = "x",
 	Callback = function(v)
-		if scrollSpeedUpdating then
+		if spdSync then
 			return
 		end
 		local sv = clampSpeed(v)
@@ -1136,7 +1226,7 @@ sMs = MainControls:AddSlider("HitOffset", {
 	Suffix = "ms",
 	Callback = function(v)
 		local value = math.clamp(tonumber(v) or 0, -500, 500)
-		OffsetMs = value
+		st.off = value
 	end
 })
 
@@ -1149,38 +1239,38 @@ MainControls:AddInput("HitOffsetInput", {
 	Callback = function(v)
 		local n = math.clamp(tonumber(v) or 0, -500, 500)
 		sMs:SetValue(n)
-		OffsetMs = n
+		st.off = n
 	end
 })
 
-inputModeDropdown = MainControls:AddDropdown("InputMode", {
+inModeDrop = MainControls:AddDropdown("InputMode", {
 	Text = "Input method",
 	Values = {
 		"Virtual Input",
 		"firesignal"
 	},
-	Default = InputMode,
+	Default = st.inMode,
 	Callback = function(opt)
 		local sel = typeof(opt) == "table" and opt[1] or opt or "Virtual Input"
 		if sel == "firesignal" and typeof(firesignal) ~= "function" then
 			notify("Missing requirement", "firesignal is required for firesignal mode; using Virtual Input instead.", 6)
-			InputMode = "Virtual Input"
-			if inputModeDropdown then
-				inputModeDropdown:SetValue("Virtual Input")
+			st.inMode = "Virtual Input"
+			if inModeDrop then
+				inModeDrop:SetValue("Virtual Input")
 			end
 			return
 		end
-		InputMode = sel
+		st.inMode = sel
 	end
 })
 
 MainControls:AddLabel("if firesignal doesn't work\nswitch to Virtual Input")
 
-hideMobileToggle = MiscControls:AddToggle("HideMobileButtons", {
+hideMobTg = MiscControls:AddToggle("HideMobileButtons", {
 	Text = "Hide Mobile Buttons",
 	Default = true,
 	Callback = function(v)
-		HideMobileBtns = v
+		st.hideMb = v
 		local eng = PlayerGui:FindFirstChild("FNFEngine")
 		if not eng then
 			return
@@ -1213,9 +1303,17 @@ soloToggle = MiscControls:AddToggle("AutoSolo", {
 
 antiMissToggle = MiscControls:AddToggle("AntiMiss", {
 	Text = "Anti Miss",
-	Default = AntiMissEnabled,
+	Default = st.aMiss,
 	Callback = function(v)
-		AntiMissEnabled = v and true or false
+		st.aMiss = v and true or false
+	end
+})
+
+deadTg = MiscControls:AddToggle("AntiDeath", {
+	Text = "Anti Death",
+	Default = st.aDead,
+	Callback = function(v)
+		setAd(v)
 	end
 })
 
@@ -1227,11 +1325,11 @@ if actorsAPI then
 			"normal",
 			"actor"
 		},
-		Default = Mode,
+		Default = st.mode,
 		Callback = function(opt)
-			local sel = typeof(opt) == "table" and opt[1] or opt or Mode
+			local sel = typeof(opt) == "table" and opt[1] or opt or st.mode
 			if sel == "actor" or sel == "normal" then
-				Mode = sel
+				st.mode = sel
 			end
 		end
 	})
@@ -1364,7 +1462,7 @@ cursorToggle = uiSettings:AddToggle("ObsidianCursor", {
 		if v then
 			return
 		end
-		UserInputService.MouseIconEnabled = true
+		svc.ui.MouseIconEnabled = true
 	end
 })
 
@@ -1384,11 +1482,11 @@ uiSettings:AddToggle("LockDraggingToggle", {
 	end
 })
 
-local currentNotifySide = Obsidian.NotifySide or "Right"
-if type(currentNotifySide) == "string" then
-	currentNotifySide = currentNotifySide:sub(1, 1):upper() .. currentNotifySide:sub(2):lower()
+local noteSide = Obsidian.NotifySide or "Right"
+if type(noteSide) == "string" then
+	noteSide = noteSide:sub(1, 1):upper() .. noteSide:sub(2):lower()
 else
-	currentNotifySide = "Right"
+	noteSide = "Right"
 end
 
 uiSettings:AddDropdown("NotifySideDropdown", {
@@ -1397,7 +1495,7 @@ uiSettings:AddDropdown("NotifySideDropdown", {
 		"Right",
 		"Left"
 	},
-	Default = currentNotifySide,
+	Default = noteSide,
 	Callback = function(value)
 		local side = value == "Left" and "Left" or "Right"
 		Obsidian:SetNotifySide(side)
@@ -1413,7 +1511,7 @@ uiSettings:AddToggle("CompactSidebarToggle", {
 })
 
 local toggleKeyLabel = uiSettings:AddLabel("UI toggle key")
-local toggleKeyPicker
+local keyPick
 
 local function resolveKeyCode(nameOrEnum)
 	if typeof(nameOrEnum) == "EnumItem" then
@@ -1429,42 +1527,50 @@ local function resolveKeyCode(nameOrEnum)
 	return nil
 end
 
-local function applyUIToggleKey()
-	if not toggleKeyPicker then
+local function applyUiKey()
+	if not keyPick then
 		return
 	end
-	local keyName = toggleKeyPicker.Value
+	local keyName = keyPick.Value
 	local enumValue = resolveKeyCode(keyName)
 	if enumValue then
 		Obsidian.ToggleKeybind = enumValue
 	end
 end
 
-local toggleKeyDefault = "RightControl"
+local keyDef = "RightControl"
 if typeof(Obsidian.ToggleKeybind) == "EnumItem" then
-	toggleKeyDefault = Obsidian.ToggleKeybind.Name
+	keyDef = Obsidian.ToggleKeybind.Name
 end
 
 toggleKeyLabel:AddKeyPicker("UIToggleKeyPicker", {
 	Text = "UI Toggle Key",
-	Default = toggleKeyDefault,
+	Default = keyDef,
 	Mode = "Toggle",
 	SyncToggleState = false
 })
 
-toggleKeyPicker = Obsidian.Options.UIToggleKeyPicker
-if toggleKeyPicker then
-	toggleKeyPicker:OnChanged(applyUIToggleKey)
-	applyUIToggleKey()
+keyPick = Obsidian.Options.UIToggleKeyPicker
+if keyPick then
+	keyPick:OnChanged(applyUiKey)
+	applyUiKey()
 end
 
 local scriptGroup = TabSettings:AddRightGroupbox("Script Controls")
 
+scriptGroup:AddToggle("AntiKick", {
+	Text = "Anti Kick",
+	Default = st.aKick,
+	Callback = function(v)
+		st.aKick = v and true or false
+	end
+})
+
 brpcToggle = scriptGroup:AddToggle("BloxstrapRPC", {
 	Text = "Bloxstrap RPC",
-	Default = BRPCEnabled,
+	Default = st.brpc,
 	Callback = function(v)
-		BRPCEnabled = v
+		st.brpc = v
 		if v then
 			scan()
 		end
@@ -1474,13 +1580,13 @@ brpcToggle = scriptGroup:AddToggle("BloxstrapRPC", {
 scriptGroup:AddButton("Reload script", {
 	Text = "Reload script",
 	Func = function()
-		AutoEnabled = false
-		pcall(ReleaseAllActiveLanes)
-		detachScrollWatcher()
+		st.auto = false
+		pcall(st.rel)
+		dropSw()
 		connections:disconnect()
-		regGuiListeners()
+		st.regUi()
 		scan()
-		AutoEnabled = true
+		st.auto = true
 		notify("FNB", "Reloaded.", 4)
 	end
 })
@@ -1488,8 +1594,8 @@ scriptGroup:AddButton("Reload script", {
 scriptGroup:AddButton("Unload script", {
 	Text = "Unload script",
 	Func = function()
-		AutoEnabled = false
-		pcall(ReleaseAllActiveLanes)
+		st.auto = false
+		pcall(st.rel)
 		connections:disconnect()
 		pcall(function()
 			Obsidian:Unload()
@@ -1530,38 +1636,38 @@ end
 
 do
 	if reqok() then
-		local oldIndex
+		-- local oldIndex
 		local oldNamecall
-		oldIndex = hookmetamethod(game, "__index", function(self, m)
-			if not checkcaller() and self == Client and typeof(m) == "string" and m:lower() == "kick" then
-				return error("Expected ':' not '.' calling member function Kick", 2)
-			end
-			return oldIndex(self, m)
-		end)
+		-- oldIndex = hookmetamethod(game, "__index", function(self, m)
+		-- 	if not checkcaller() and self == Client and typeof(m) == "string" and m:lower() == "kick" then
+		-- 		return error("Expected ':' not '.' calling member function Kick", 2)
+		-- 	end
+		-- 	return oldIndex(self, m)
+		-- end)
 		oldNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
 			local l = (getnamecallmethod() or ""):lower()
 			if not checkcaller() then
-				if self == Client and l == "kick" then
+				if st.aKick and self == Client and l == "kick" then
 					return
 				end
-				if l == "findservice" then
-					local first = ...
-					if typeof(first) == "string" and first:lower() == "virtualinputmanager" then
-						return
-					end
-				end
+				-- if l == "findservice" then
+				-- 	local first = ...
+				-- 	if typeof(first) == "string" and first:lower() == "virtualinputmanager" then
+				-- 		return
+				-- 	end
+				-- end
 				if typeof(self) == "Instance" and (l == "fireserver" or l == "invokeserver") then
 					local name = tostring(self.Name)
-					if name:lower() == "userinputasync" then
-						return
-					end
-					if self == TakeDamageRemote then
-						return
-					end
-					if name == "TakeDamage" and self.Parent and self.Parent.Name == "Engine" then
-						return
-					end
-					if self == RF and AntiMissEnabled then
+					-- if name:lower() == "userinputasync" then
+					-- 	return
+					-- end
+					-- if self == TakeDamageRemote then
+					-- 	return
+					-- end
+					-- if name == "TakeDamage" and self.Parent and self.Parent.Name == "Engine" then
+					-- 	return
+					-- end
+					if self == RF and st.aMiss then
 						local args = { ... }
 						local payload = args[2]
 						if typeof(payload) == "table" then
@@ -1600,7 +1706,7 @@ do
 	end
 end
 
-onChildAdded = function(Object)
+st.onAdd = function(Object)
 	if not Object or Object.Name ~= "FNFEngine" then
 		scan()
 		return
@@ -1631,7 +1737,7 @@ onChildAdded = function(Object)
 		local ps = s and s:FindFirstChild("PlaybackSpeed")
 		return ps and tonumber(ps.Value) or 1
 	end)()
-	local baseOffset = computeBaseOffset(scrollSpeed)
+	local baseOffset = calcOff(scrollSpeed)
 	local sideValue = Object.Engine.PlayerSide.Value
 	local sideFolder = Object.Engine.Game:FindFirstChild(sideValue)
 	local Arrows = sideFolder and sideFolder:FindFirstChild("Arrows")
@@ -1656,26 +1762,26 @@ onChildAdded = function(Object)
 	local mbMain = Object.Engine:FindFirstChild("MobileButtons")
 	local contMain = mbMain and mbMain:FindFirstChild("Container")
 	if contMain then
-		contMain.Visible = not HideMobileBtns
+		contMain.Visible = not st.hideMb
 	end
 	local MobileButtons = Object.Engine:FindFirstChild("MobileButtons")
-	local MobileContainer = MobileButtons and MobileButtons:FindFirstChild("Container")
+	local mobCont = MobileButtons and MobileButtons:FindFirstChild("Container")
 
 	local function sendLaneKey(isDown, keyCode)
 		if not keyCode then
 			return
 		end
-		if VirtualInputManager then
-			VirtualInputManager:SendKeyEvent(isDown, keyCode, false, nil)
+		if svc.vim then
+			svc.vim:SendKeyEvent(isDown, keyCode, false, nil)
 		end
 	end
 
 	local function pressLane(name, keyCode)
-		if InputMode == "firesignal" then
-			pressLaneMobile(MobileContainer, name)
+		if st.inMode == "firesignal" then
+			pressMob(mobCont, name)
 			return
 		end
-		if Mode == "actor" then
+		if st.mode == "actor" then
 			if not actorKey("press", keyCode) then
 				sendLaneKey(true, keyCode)
 			end
@@ -1685,11 +1791,11 @@ onChildAdded = function(Object)
 	end
 
 	local function releaseLane(name, keyCode)
-		if InputMode == "firesignal" then
-			releaseLaneMobile(MobileContainer, name)
+		if st.inMode == "firesignal" then
+			relMob(mobCont, name)
 			return
 		end
-		if Mode == "actor" then
+		if st.mode == "actor" then
 			if not actorKey("release", keyCode) then
 				sendLaneKey(false, keyCode)
 			end
@@ -1701,7 +1807,7 @@ onChildAdded = function(Object)
 	local laneDown = {}
 	local laneCount = {}
 
-	ReleaseAllActiveLanes = function()
+	st.rel = function()
 		for holderName, down in pairs(laneDown) do
 			if down then
 				local code = Session[holderName]
@@ -1729,7 +1835,7 @@ onChildAdded = function(Object)
 
 	local AutoCtx = {
 		enabled = true,
-		offsetMs = OffsetMs,
+		offsetMs = st.off,
 		baseOffset = baseOffset,
 		laneDown = laneDown,
 		laneCount = laneCount,
@@ -1760,26 +1866,64 @@ onChildAdded = function(Object)
 				if not keyCode then
 					return
 				end
-				if not AutoEnabled then
+				if not st.auto then
 					return
 				end
-				AutoCtx.enabled = AutoEnabled
-				AutoCtx.offsetMs = OffsetMs
-				AutoCtx.baseOffset = computeBaseOffset(Input.ScrollSpeedChange.Value and Input.ScrollSpeed.Value or 1)
-				playNoteSequence(Holder, Arrow, keyCode, AutoCtx)
+				AutoCtx.enabled = st.auto
+				AutoCtx.offsetMs = st.off
+				AutoCtx.baseOffset = calcOff(Input.ScrollSpeedChange.Value and Input.ScrollSpeed.Value or 1)
+				playSeq(Holder, Arrow, keyCode, AutoCtx)
 			end)
 		end)
 	end
 end
 
-regGuiListeners = function()
+st.regUi = function()
+	connections:add(Client.CharacterAdded, function(char)
+		task.spawn(function()
+			local humanoid = char and (char:FindFirstChildOfClass("Humanoid") or char:WaitForChild("Humanoid", 10))
+			if humanoid and st.aDead then
+				applyAd(humanoid)
+			end
+		end)
+	end)
+	connections:add(svc.run.RenderStepped, function()
+		if not st.aDead then
+			return
+		end
+		applyAd(getHum())
+	end)
+	if svc.run.PreSimulation then
+		connections:add(svc.run.PreSimulation, function()
+			if not st.aDead then
+				return
+			end
+			local humanoid = getHum()
+			if humanoid and humanoid.Health < humanoid.MaxHealth then
+				pcall(function()
+					humanoid.Health = humanoid.MaxHealth
+				end)
+			end
+		end)
+	end
+	connections:add(svc.run.Heartbeat, function()
+		if not st.aDead then
+			return
+		end
+		local humanoid = getHum()
+		if humanoid and humanoid.Health < humanoid.MaxHealth then
+			pcall(function()
+				humanoid.Health = humanoid.MaxHealth
+			end)
+		end
+	end)
 	connections:add(PlayerGui.ChildAdded, function(o)
 		task.defer(function()
 			if o and o.Name == "FNFEngine" then
 				applyMods(true)
 			end
 			if o and o.Name == "GameUI" then
-				attachScrollWatcher()
+				bindSw()
 				watchSongSel(o)
 			end
 		end)
@@ -1787,7 +1931,7 @@ regGuiListeners = function()
 	connections:add(PlayerGui.ChildAdded, function(o)
 		task.defer(function()
 			if o and o.Name == "FNFEngine" then
-				onChildAdded(o)
+				st.onAdd(o)
 			end
 		end)
 	end)
@@ -1796,14 +1940,14 @@ regGuiListeners = function()
 			scan()
 		end
 		if o and o.Name == "GameUI" then
-			detachScrollWatcher()
+			dropSw()
 			clearSongWatch()
 		end
 	end)
 	connections:add(PlayerGui.DescendantAdded, function(o)
 		task.defer(function()
-			if o.Name == "TakeDamage" and o.Parent and o.Parent.Name == "Engine" then
-				TakeDamageRemote = o
+			if o and o.Name == "TakeDamage" and o.Parent and o.Parent.Name == "Engine" then
+				killTd(o)
 			end
 		end)
 	end)
@@ -1817,21 +1961,29 @@ regGuiListeners = function()
 			end)
 			local td = engine:FindFirstChild("TakeDamage")
 			if td then
-				TakeDamageRemote = td
+				killTd(td)
 			end
 		end
 		task.spawn(function()
-			onChildAdded(existingEngine)
+			st.onAdd(existingEngine)
 		end)
 	end
 	local existingGameUI = PlayerGui:FindFirstChild("GameUI")
 	if existingGameUI then
-		attachScrollWatcher()
+		bindSw()
 		watchSongSel(existingGameUI)
+	end
+	if st.aDead then
+		task.spawn(function()
+			local humanoid = getHum()
+			if humanoid then
+				applyAd(humanoid)
+			end
+		end)
 	end
 end
 
-regGuiListeners()
+st.regUi()
 scan()
 
 for _, v in pairs(workspace:QueryDescendants("Instance")) do
