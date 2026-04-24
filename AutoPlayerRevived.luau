@@ -53,7 +53,9 @@ local watchers = {
 	scrollAnces = nil,
 	solo = nil,
 	songChild = nil,
-	songVis = nil
+	songVis = nil,
+	lullaby = nil,
+	lullabyEngine = nil
 }
 
 local spLimit = 15
@@ -287,6 +289,7 @@ local st = {
 	aKick = true,
 	aMiss = false,
 	aDead = false,
+	autoDeleteLullaby = true,
 	inMode = "Virtual Input",
 	adHp = 1000000000,
 	adHum = nil,
@@ -819,34 +822,42 @@ local function playSeq(Holder, Arrow, keyCode, AutoCtx)
 	end)
 end
 
-local function purgeLullaby(engine)
-	if not engine then
+local function killLullabyChild(child)
+	if not st.autoDeleteLullaby or not child then
 		return
 	end
-	task.wait(5)
-	local bg = engine:FindFirstChild("background")
-	if bg and bg:IsA("Frame") then
-		bg:Destroy()
+	if child.Name == "background" and child:IsA("Frame") then
+		child:Destroy()
+	elseif child.Name == "static" and child:IsA("Sound") then
+		child:Destroy()
 	end
-	for _, d in ipairs(engine:GetChildren()) do
-		if d.Name == "static" and d:IsA("Sound") then
-			d:Destroy()
+end
+
+local function syncLullabyPurge(engine)
+	if watchers.lullaby then
+		watchers.lullaby:Disconnect()
+		watchers.lullaby = nil
+	end
+	watchers.lullabyEngine = engine
+	if not engine or not st.autoDeleteLullaby then
+		return
+	end
+	task.spawn(function()
+		task.wait(5)
+		if watchers.lullabyEngine ~= engine or not st.autoDeleteLullaby or not engine.Parent then
+			return
 		end
-	end
-	connections:add(engine.ChildAdded, function(c)
-		task.defer(function()
-			if c.Name == "background" and c:IsA("Frame") then
-				c:Destroy()
-			elseif c.Name == "static" and c:IsA("Sound") then
-				c:Destroy()
-			end
-		end)
+		killLullabyChild(engine:FindFirstChild("background"))
+		for _, child in ipairs(engine:GetChildren()) do
+			killLullabyChild(child)
+		end
 	end)
-	connections:add(engine.ChildAdded, function(d)
+	watchers.lullaby = engine.ChildAdded:Connect(function(child)
 		task.defer(function()
-			if d.Name == "static" and d:IsA("Sound") then
-				d:Destroy()
+			if watchers.lullabyEngine ~= engine then
+				return
 			end
+			killLullabyChild(child)
 		end)
 	end)
 end
@@ -1301,6 +1312,16 @@ soloToggle = MiscControls:AddToggle("AutoSolo", {
 	end
 })
 
+MiscControls:AddToggle("AutoDeleteLullaby", {
+	Text = "Auto Delete Lullaby",
+	Default = st.autoDeleteLullaby,
+	Callback = function(v)
+		st.autoDeleteLullaby = v and true or false
+		local existingEngine = PlayerGui:FindFirstChild("FNFEngine")
+		syncLullabyPurge(existingEngine and existingEngine:FindFirstChild("Engine") or nil)
+	end
+})
+
 antiMissToggle = MiscControls:AddToggle("AntiMiss", {
 	Text = "Anti Miss",
 	Default = st.aMiss,
@@ -1713,7 +1734,7 @@ st.onAdd = function(Object)
 	end
 	local Engine = Object.Engine
 	task.spawn(function()
-		purgeLullaby(Engine)
+		syncLullabyPurge(Engine)
 	end)
 	local function IsOnHit(m)
 		return m ~= nil and (require(m)).Type == "OnHit"
@@ -1937,6 +1958,7 @@ st.regUi = function()
 	end)
 	connections:add(PlayerGui.ChildRemoved, function(o)
 		if o and o.Name == "FNFEngine" then
+			syncLullabyPurge(nil)
 			scan()
 		end
 		if o and o.Name == "GameUI" then
@@ -1956,9 +1978,7 @@ st.regUi = function()
 		applyMods(true)
 		local engine = existingEngine:FindFirstChild("Engine")
 		if engine then
-			task.spawn(function()
-				purgeLullaby(engine)
-			end)
+			syncLullabyPurge(engine)
 			local td = engine:FindFirstChild("TakeDamage")
 			if td then
 				killTd(td)
