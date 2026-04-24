@@ -295,8 +295,46 @@ local st = {
 	adHum = nil,
 	adOrig = {}
 }
-if typeof(firesignal) ~= "function" then
+local firesignalChecked = false
+local firesignalWorks = false
+local firesignalReason = "firesignal is unavailable."
+
+local function canUseFireSignal(forceRecheck)
+	if not forceRecheck and firesignalChecked then
+		return firesignalWorks, firesignalReason
+	end
+	firesignalChecked = true
+	firesignalWorks = false
+	if typeof(firesignal) ~= "function" then
+		firesignalReason = "firesignal is unavailable because your executor does not provide the function."
+		return false, firesignalReason
+	end
+	local probe = Instance.new("BindableEvent")
+	local fired = false
+	local conn = probe.Event:Connect(function()
+		fired = true
+	end)
+	local ok = pcall(firesignal, probe.Event)
+	conn:Disconnect()
+	probe:Destroy()
+	firesignalWorks = ok and fired
+	if firesignalWorks then
+		firesignalReason = ""
+	else
+		firesignalReason = "firesignal exists, but it does not work in this executor."
+	end
+	return firesignalWorks, firesignalReason
+end
+
+local firesignalAvailable = canUseFireSignal()
+local hookRequirementsAvailable = typeof(hookmetamethod) == "function" and typeof(newcclosure) == "function" and typeof(getnamecallmethod) == "function" and typeof(checkcaller) == "function"
+
+if not firesignalAvailable then
 	st.inMode = "Virtual Input"
+end
+if not hookRequirementsAvailable then
+	st.aKick = false
+	st.aMiss = false
 end
 
 local gEnv
@@ -314,7 +352,7 @@ svc.run.RenderStepped:Connect(function()
 	pcall(function()
 		local li = gEnv.LastInput
 		if li then
-			if st.inMode == "firesignal" then
+			if st.inMode == "firesignal" and canUseFireSignal() then
 				li.Value = Enum.UserInputType.Touch
 			else
 				li.Value = Enum.UserInputType.Keyboard
@@ -517,7 +555,7 @@ local function guiClick(btn)
 	if not btn then
 		return
 	end
-	if typeof(firesignal) == "function" then
+	if canUseFireSignal() then
 		pcall(firesignal, btn.MouseButton1Down)
 		task.wait()
 		pcall(firesignal, btn.MouseButton1Click)
@@ -688,7 +726,7 @@ local function calcOff(scrollSpeed)
 end
 
 local function pressMob(container, name)
-	if typeof(firesignal) ~= "function" then
+	if not canUseFireSignal() then
 		return
 	end
 	if not container then
@@ -704,7 +742,7 @@ local function pressMob(container, name)
 end
 
 local function relMob(container, name)
-	if typeof(firesignal) ~= "function" then
+	if not canUseFireSignal() then
 		return
 	end
 	if not container then
@@ -864,7 +902,7 @@ end
 
 local MainControls = TabMain:AddLeftGroupbox("Autoplayer")
 local MiscControls = TabMain:AddRightGroupbox("Options")
-local AutoModsGroup = TabMain:AddRightGroupbox("Auto Modifiers")
+local AutoModsGroup = firesignalAvailable and TabMain:AddRightGroupbox("Auto Modifiers") or nil
 
 local tAuto
 local sSpd
@@ -877,6 +915,26 @@ local cursorToggle
 local antiMissToggle
 local deadTg
 local inModeDrop
+
+local function setInputMode(opt)
+	local sel = typeof(opt) == "table" and opt[1] or opt or "Virtual Input"
+	local wasMode = st.inMode
+	local canFireSignal, fireSignalIssue = canUseFireSignal(sel == "firesignal")
+	if sel == "firesignal" and not canFireSignal then
+		notify("firesignal unavailable", string.format("A working firesignal is required for firesignal mode; using Virtual Input instead.\nReason: %s", fireSignalIssue), 6)
+		st.inMode = "Virtual Input"
+		if inModeDrop then
+			inModeDrop:SetValue("Virtual Input")
+		end
+		return
+	end
+	st.inMode = sel
+	if sel == "firesignal" then
+		if wasMode ~= "firesignal" then
+			notify("firesignal warning", "firesignal spoofs Touch/Mobile input to work. FNB does not support lullaby on mobile, so it will not add or use lullaby there.", 8)
+		end
+	end
+end
 
 local function doSolo(singleplayerUI)
 	local sp = singleplayerUI or PlayerGui:FindFirstChild("SingleplayerUI")
@@ -1254,45 +1312,40 @@ MainControls:AddInput("HitOffsetInput", {
 	end
 })
 
-inModeDrop = MainControls:AddDropdown("InputMode", {
-	Text = "Input method",
-	Values = {
-		"Virtual Input",
-		"firesignal"
-	},
-	Default = st.inMode,
-	Callback = function(opt)
-		local sel = typeof(opt) == "table" and opt[1] or opt or "Virtual Input"
-		if sel == "firesignal" and typeof(firesignal) ~= "function" then
-			notify("Missing requirement", "firesignal is required for firesignal mode; using Virtual Input instead.", 6)
-			st.inMode = "Virtual Input"
-			if inModeDrop then
-				inModeDrop:SetValue("Virtual Input")
+if firesignalAvailable then
+	inModeDrop = MainControls:AddDropdown("InputMode", {
+		Text = "Input method",
+		Values = {
+			"Virtual Input",
+			"firesignal"
+		},
+		Default = st.inMode,
+		Callback = setInputMode
+	})
+
+	MainControls:AddLabel("firesignal mode spoofs Touch\ninput")
+	MainControls:AddLabel("FNB doesn't support lullaby on\nmobile")
+	MainControls:AddLabel("so it will not add or use lullaby")
+	MainControls:AddLabel("if firesignal doesn't work")
+	MainControls:AddLabel("switch to Virtual Input")
+
+	hideMobTg = MiscControls:AddToggle("HideMobileButtons", {
+		Text = "Hide Mobile Buttons",
+		Default = true,
+		Callback = function(v)
+			st.hideMb = v
+			local eng = PlayerGui:FindFirstChild("FNFEngine")
+			if not eng then
+				return
 			end
-			return
+			local mb = eng.Engine:FindFirstChild("MobileButtons")
+			local cont = mb and mb:FindFirstChild("Container")
+			if cont then
+				cont.Visible = not v
+			end
 		end
-		st.inMode = sel
-	end
-})
-
-MainControls:AddLabel("if firesignal doesn't work\nswitch to Virtual Input")
-
-hideMobTg = MiscControls:AddToggle("HideMobileButtons", {
-	Text = "Hide Mobile Buttons",
-	Default = true,
-	Callback = function(v)
-		st.hideMb = v
-		local eng = PlayerGui:FindFirstChild("FNFEngine")
-		if not eng then
-			return
-		end
-		local mb = eng.Engine:FindFirstChild("MobileButtons")
-		local cont = mb and mb:FindFirstChild("Container")
-		if cont then
-			cont.Visible = not v
-		end
-	end
-})
+	})
+end
 
 MiscControls:AddButton("Instant Solo", {
 	Text = "Instant Solo",
@@ -1322,13 +1375,15 @@ MiscControls:AddToggle("AutoDeleteLullaby", {
 	end
 })
 
-antiMissToggle = MiscControls:AddToggle("AntiMiss", {
-	Text = "Anti Miss",
-	Default = st.aMiss,
-	Callback = function(v)
-		st.aMiss = v and true or false
-	end
-})
+if hookRequirementsAvailable then
+	antiMissToggle = MiscControls:AddToggle("AntiMiss", {
+		Text = "Anti Miss",
+		Default = st.aMiss,
+		Callback = function(v)
+			st.aMiss = v and true or false
+		end
+	})
+end
 
 deadTg = MiscControls:AddToggle("AntiDeath", {
 	Text = "Anti Death",
@@ -1356,92 +1411,94 @@ if actorsAPI then
 	})
 end
 
-AutoModsGroup:AddLabel("Hard Modifiers")
+if AutoModsGroup then
+	AutoModsGroup:AddLabel("Hard Modifiers")
 
-AutoModsGroup:AddToggle("AM_Hard_Death", {
-	Text = "Death",
-	Default = false,
-	Callback = function(v)
-		AutoModFlags.Hard.Death = v
-		queueModApply("Hard", "Death", v)
-	end
-})
+	AutoModsGroup:AddToggle("AM_Hard_Death", {
+		Text = "Death",
+		Default = false,
+		Callback = function(v)
+			AutoModFlags.Hard.Death = v
+			queueModApply("Hard", "Death", v)
+		end
+	})
 
-AutoModsGroup:AddToggle("AM_Hard_FadeIn", {
-	Text = "FadeIn",
-	Default = false,
-	Callback = function(v)
-		AutoModFlags.Hard.FadeIn = v
-		queueModApply("Hard", "FadeIn", v)
-	end
-})
+	AutoModsGroup:AddToggle("AM_Hard_FadeIn", {
+		Text = "FadeIn",
+		Default = false,
+		Callback = function(v)
+			AutoModFlags.Hard.FadeIn = v
+			queueModApply("Hard", "FadeIn", v)
+		end
+	})
 
-AutoModsGroup:AddToggle("AM_Hard_FadeOut", {
-	Text = "FadeOut",
-	Default = false,
-	Callback = function(v)
-		AutoModFlags.Hard.FadeOut = v
-		queueModApply("Hard", "FadeOut", v)
-	end
-})
+	AutoModsGroup:AddToggle("AM_Hard_FadeOut", {
+		Text = "FadeOut",
+		Default = false,
+		Callback = function(v)
+			AutoModFlags.Hard.FadeOut = v
+			queueModApply("Hard", "FadeOut", v)
+		end
+	})
 
-AutoModsGroup:AddToggle("AM_Hard_Pendulum", {
-	Text = "Pendulum",
-	Default = false,
-	Callback = function(v)
-		AutoModFlags.Hard.Pendulum = v
-		queueModApply("Hard", "Pendulum", v)
-	end
-})
+	AutoModsGroup:AddToggle("AM_Hard_Pendulum", {
+		Text = "Pendulum",
+		Default = false,
+		Callback = function(v)
+			AutoModFlags.Hard.Pendulum = v
+			queueModApply("Hard", "Pendulum", v)
+		end
+	})
 
-AutoModsGroup:AddToggle("AM_Hard_Perfect", {
-	Text = "Perfect",
-	Default = false,
-	Callback = function(v)
-		AutoModFlags.Hard.Perfect = v
-		queueModApply("Hard", "Perfect", v)
-	end
-})
+	AutoModsGroup:AddToggle("AM_Hard_Perfect", {
+		Text = "Perfect",
+		Default = false,
+		Callback = function(v)
+			AutoModFlags.Hard.Perfect = v
+			queueModApply("Hard", "Perfect", v)
+		end
+	})
 
-AutoModsGroup:AddToggle("AM_Hard_SuddenDeath", {
-	Text = "SuddenDeath",
-	Default = false,
-	Callback = function(v)
-		AutoModFlags.Hard.SuddenDeath = v
-		queueModApply("Hard", "SuddenDeath", v)
-	end
-})
+	AutoModsGroup:AddToggle("AM_Hard_SuddenDeath", {
+		Text = "SuddenDeath",
+		Default = false,
+		Callback = function(v)
+			AutoModFlags.Hard.SuddenDeath = v
+			queueModApply("Hard", "SuddenDeath", v)
+		end
+	})
 
-AutoModsGroup:AddDivider()
+	AutoModsGroup:AddDivider()
 
-AutoModsGroup:AddLabel("Normal Modifiers")
+	AutoModsGroup:AddLabel("Normal Modifiers")
 
-AutoModsGroup:AddToggle("AM_Normal_GhostTapping", {
-	Text = "GhostTapping",
-	Default = false,
-	Callback = function(v)
-		AutoModFlags.Normal.GhostTapping = v
-		queueModApply("Normal", "GhostTapping", v)
-	end
-})
+	AutoModsGroup:AddToggle("AM_Normal_GhostTapping", {
+		Text = "GhostTapping",
+		Default = false,
+		Callback = function(v)
+			AutoModFlags.Normal.GhostTapping = v
+			queueModApply("Normal", "GhostTapping", v)
+		end
+	})
 
-AutoModsGroup:AddToggle("AM_Normal_Mirror", {
-	Text = "Mirror",
-	Default = false,
-	Callback = function(v)
-		AutoModFlags.Normal.Mirror = v
-		queueModApply("Normal", "Mirror", v)
-	end
-})
+	AutoModsGroup:AddToggle("AM_Normal_Mirror", {
+		Text = "Mirror",
+		Default = false,
+		Callback = function(v)
+			AutoModFlags.Normal.Mirror = v
+			queueModApply("Normal", "Mirror", v)
+		end
+	})
 
-AutoModsGroup:AddToggle("AM_Normal_Random", {
-	Text = "Random",
-	Default = false,
-	Callback = function(v)
-		AutoModFlags.Normal.Random = v
-		queueModApply("Normal", "Random", v)
-	end
-})
+	AutoModsGroup:AddToggle("AM_Normal_Random", {
+		Text = "Random",
+		Default = false,
+		Callback = function(v)
+			AutoModFlags.Normal.Random = v
+			queueModApply("Normal", "Random", v)
+		end
+	})
+end
 
 local creditsGroup = TabCredits:AddLeftGroupbox("Credits")
 
@@ -1579,13 +1636,15 @@ end
 
 local scriptGroup = TabSettings:AddRightGroupbox("Script Controls")
 
-scriptGroup:AddToggle("AntiKick", {
-	Text = "Anti Kick",
-	Default = st.aKick,
-	Callback = function(v)
-		st.aKick = v and true or false
-	end
-})
+if hookRequirementsAvailable then
+	scriptGroup:AddToggle("AntiKick", {
+		Text = "Anti Kick",
+		Default = st.aKick,
+		Callback = function(v)
+			st.aKick = v and true or false
+		end
+	})
+end
 
 brpcToggle = scriptGroup:AddToggle("BloxstrapRPC", {
 	Text = "Bloxstrap RPC",
@@ -1798,7 +1857,7 @@ st.onAdd = function(Object)
 	end
 
 	local function pressLane(name, keyCode)
-		if st.inMode == "firesignal" then
+		if st.inMode == "firesignal" and canUseFireSignal() then
 			pressMob(mobCont, name)
 			return
 		end
@@ -1812,7 +1871,7 @@ st.onAdd = function(Object)
 	end
 
 	local function releaseLane(name, keyCode)
-		if st.inMode == "firesignal" then
+		if st.inMode == "firesignal" and canUseFireSignal() then
 			relMob(mobCont, name)
 			return
 		end
