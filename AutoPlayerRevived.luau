@@ -115,8 +115,23 @@ local svc = {
 	mps = __lt.cs("MarketplaceService", cloneref),
 	rs = __lt.cs("ReplicatedStorage", cloneref),
 	run = __lt.cs("RunService", cloneref),
-	vim = __lt.cs("VirtualInputManager", cloneref)
+	vim = nil
 }
+
+local function getVim()
+	if svc.vim and typeof(svc.vim) == "Instance" then
+		return svc.vim
+	end
+
+	local ok, vim = pcall(function()
+		return __lt.cs("VirtualInputManager", cloneref)
+	end)
+
+	if ok and vim then
+		svc.vim = vim
+		return vim
+	end
+end
 
 local RE = svc.rs:WaitForChild("Modules"):WaitForChild("Network"):WaitForChild("RE")
 local RF = svc.rs:WaitForChild("Modules"):WaitForChild("Network"):WaitForChild("RF")
@@ -290,6 +305,7 @@ local st = {
 	aMiss = false,
 	aDead = false,
 	autoDeleteLullaby = true,
+	matchEngine = nil,
 	inMode = "Virtual Input",
 	adHp = 1000000000,
 	adHum = nil,
@@ -739,46 +755,20 @@ local function actorKey(op, keyCode)
 
 	local down = op == "press"
 	local src = string.format([[
-		local vim
 		local isDown = %s
 		local kc = Enum.KeyCode[%q]
-		local cref = type(cloneref) == "function" and cloneref or nil
-		local live = __lt.gs("VirtualInputManager")
-		local ok, svc = cref and pcall(function()
-			return __lt.cs("VirtualInputManager", cref)
+		local ok, vim = pcall(function()
+			return Instance.new("VirtualInputManager")
 		end)
-		if ok and svc then
-			vim = setmetatable({}, {
-				__index = function(_, key)
-					local current = __lt.gs("VirtualInputManager")
-					local value = current[key]
-					if type(value) == "function" then
-						return function(_, ...)
-							return value(current, ...)
-						end
-					end
-					if cref and typeof(value) == "Instance" then
-						local ok2, cloned = pcall(cref, value)
-						if ok2 and cloned ~= nil then
-							return cloned
-						end
-					end
-					return value
-				end,
-				__newindex = function(_, key, value)
-					__lt.gs("VirtualInputManager")[key] = value
-				end
-			})
-		else
-			vim = live
-		end
-		if vim then
-			vim:SendKeyEvent(isDown, kc, false, nil)
+		if ok and vim then
+			pcall(function()
+				vim:SendKeyEvent(isDown, kc, false, nil)
+			end)
 		end
 	]], down and "true" or "false", keyCode.Name)
 
-	pcall(run_on_actor, actors[1], src)
-	return true
+	local okRun = pcall(run_on_actor, actors[1], src)
+	return okRun
 end
 
 local function playSeq(Holder, Arrow, keyCode, AutoCtx)
@@ -1317,8 +1307,11 @@ MiscControls:AddToggle("AutoDeleteLullaby", {
 	Default = st.autoDeleteLullaby,
 	Callback = function(v)
 		st.autoDeleteLullaby = v and true or false
-		local existingEngine = PlayerGui:FindFirstChild("FNFEngine")
-		syncLullabyPurge(existingEngine and existingEngine:FindFirstChild("Engine") or nil)
+		if st.autoDeleteLullaby and st.matchEngine and st.matchEngine.Parent then
+			syncLullabyPurge(st.matchEngine)
+		else
+			syncLullabyPurge(nil)
+		end
 	end
 })
 
@@ -1640,6 +1633,7 @@ local function reqok()
 	return typeof(hookmetamethod) == "function" and typeof(newcclosure) == "function" and typeof(getnamecallmethod) == "function" and typeof(checkcaller) == "function"
 end
 
+
 local function notifyMissing(t, c)
 	notify(t, c, 7)
 end
@@ -1657,6 +1651,7 @@ end
 
 do
 	if reqok() then
+
 		-- local oldIndex
 		local oldNamecall
 		-- oldIndex = hookmetamethod(game, "__index", function(self, m)
@@ -1671,12 +1666,6 @@ do
 				if st.aKick and self == Client and l == "kick" then
 					return
 				end
-				-- if l == "findservice" then
-				-- 	local first = ...
-				-- 	if typeof(first) == "string" and first:lower() == "virtualinputmanager" then
-				-- 		return
-				-- 	end
-				-- end
 				if typeof(self) == "Instance" and (l == "fireserver" or l == "invokeserver") then
 					local name = tostring(self.Name)
 					-- if name:lower() == "userinputasync" then
@@ -1706,24 +1695,6 @@ do
 			end
 			return oldNamecall(self, ...)
 		end))
-		local real_require = require
-		local patched = {}
-		require = function(mod)
-			local ok, obj = pcall(real_require, mod)
-			if not ok then
-				error(obj, 2)
-			end
-			if type(obj) == "table" and not patched[obj] then
-				if tostring((rawget(obj, "Type") or "")) == "OnMiss" then
-					obj.Type = "OnHit"
-					if type(obj.Run) == "function" then
-						obj.Run = function() end
-					end
-				end
-				patched[obj] = true
-			end
-			return obj
-		end
 	end
 end
 
@@ -1733,11 +1704,25 @@ st.onAdd = function(Object)
 		return
 	end
 	local Engine = Object.Engine
-	task.spawn(function()
-		syncLullabyPurge(Engine)
-	end)
 	local function IsOnHit(m)
-		return m ~= nil and (require(m)).Type == "OnHit"
+		if m == nil then
+			return false
+		end
+
+		local typ = m:GetAttribute("Type")
+		if typ == "OnHit" then
+			return true
+		end
+		if typ == "OnMiss" then
+			return false
+		end
+
+		local v = m:FindFirstChild("Type")
+		if v and v:IsA("StringValue") then
+			return v.Value == "OnHit"
+		end
+
+		return false
 	end
 	local function Filter(iter, fn)
 		local t = {}
@@ -1751,6 +1736,8 @@ st.onAdd = function(Object)
 		Object.Engine.Config.TimePast.Changed:Wait()
 	end
 	local Song = Stage.Config.Song.Value
+	st.matchEngine = Engine
+	syncLullabyPurge(Engine)
 	local PoisonNotes
 	local scrollSpeed = Input.ScrollSpeedChange.Value and Input.ScrollSpeed.Value or (function()
 		local p = Song and Song.Parent
@@ -1792,8 +1779,9 @@ st.onAdd = function(Object)
 		if not keyCode then
 			return
 		end
-		if svc.vim then
-			svc.vim:SendKeyEvent(isDown, keyCode, false, nil)
+		local vim = getVim()
+		if vim then
+			vim:SendKeyEvent(isDown, keyCode, false, nil)
 		end
 	end
 
@@ -1958,6 +1946,7 @@ st.regUi = function()
 	end)
 	connections:add(PlayerGui.ChildRemoved, function(o)
 		if o and o.Name == "FNFEngine" then
+			st.matchEngine = nil
 			syncLullabyPurge(nil)
 			scan()
 		end
@@ -1978,7 +1967,6 @@ st.regUi = function()
 		applyMods(true)
 		local engine = existingEngine:FindFirstChild("Engine")
 		if engine then
-			syncLullabyPurge(engine)
 			local td = engine:FindFirstChild("TakeDamage")
 			if td then
 				killTd(td)
