@@ -33,10 +33,21 @@ if game.GameId ~= 2953945619 then
 	return
 end
 
+local runtimeEnv = (getgenv and getgenv()) or _G
+if type(runtimeEnv.__FNBPlayerRuntime) == "table" and type(runtimeEnv.__FNBPlayerRuntime.cleanup) == "function" then
+	pcall(runtimeEnv.__FNBPlayerRuntime.cleanup)
+end
+local runtimeState = {
+	alive = true
+}
+runtimeEnv.__FNBPlayerRuntime = runtimeState
+
 local connections = {
 	_list = {},
 	add = function(self, s, cb)
-		self._list[#self._list + 1] = s:Connect(cb)
+		local conn = s:Connect(cb)
+		self._list[#self._list + 1] = conn
+		return conn
 	end,
 	disconnect = function(self)
 		for _, v in pairs(self._list) do
@@ -311,6 +322,31 @@ local st = {
 	adHum = nil,
 	adOrig = {}
 }
+runtimeState.cleanup = function()
+	if not runtimeState.alive then
+		return
+	end
+	runtimeState.alive = false
+	st.auto = false
+	pcall(st.rel)
+	connections:disconnect()
+	for key, conn in pairs(watchers) do
+		if typeof(conn) == "RBXScriptConnection" then
+			pcall(function()
+				conn:Disconnect()
+			end)
+			watchers[key] = nil
+		end
+	end
+	if runtimeEnv.__FNBPlayerRuntime == runtimeState then
+		runtimeEnv.__FNBPlayerRuntime = nil
+	end
+	pcall(function()
+		if Obsidian and Obsidian.Unload then
+			Obsidian:Unload()
+		end
+	end)
+end
 if typeof(firesignal) ~= "function" then
 	st.inMode = "Virtual Input"
 end
@@ -323,7 +359,7 @@ if typeof(getrenv) == "function" then
 	end
 end
 
-svc.run.RenderStepped:Connect(function()
+connections:add(svc.run.RenderStepped, function()
 	if not gEnv then
 		return
 	end
