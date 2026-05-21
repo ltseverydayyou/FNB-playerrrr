@@ -51,8 +51,16 @@ local connections = {
 	end,
 	disconnect = function(self)
 		for _, v in pairs(self._list) do
-			if type(v) == "userdata" and v.Connected then
-				v:Disconnect()
+			if typeof(v) == "RBXScriptConnection" then
+				pcall(function()
+					v:Disconnect()
+				end)
+			elseif type(v) == "userdata" then
+				pcall(function()
+					if v.Connected ~= false and typeof(v.Disconnect) == "function" then
+						v:Disconnect()
+					end
+				end)
 			end
 		end
 		table.clear(self._list)
@@ -68,6 +76,27 @@ local watchers = {
 	lullaby = nil,
 	lullabyEngine = nil
 }
+
+local function getDesc(root)
+	if not root then
+		return {}
+	end
+	local okQ, resQ = pcall(function()
+		if typeof(root.QueryDescendants) == "function" then
+			return root:QueryDescendants("Instance")
+		end
+	end)
+	if okQ and type(resQ) == "table" then
+		return resQ
+	end
+	local okG, resG = pcall(function()
+		return root:GetDescendants()
+	end)
+	if okG and type(resG) == "table" then
+		return resG
+	end
+	return {}
+end
 
 local spLimit = 15
 local SplashIndex = math.random(1, spLimit)
@@ -306,6 +335,24 @@ local TabSettings = Window:AddTab({
 local st = {
 	auto = true,
 	off = 0,
+	tapMs = 35,
+	relMs = 0,
+	holdTick = 0.015,
+	maxHold = 8,
+	hitOnHit = false,
+	hitPoison = false,
+	botScoreFun = false,
+	botScoreMult = 2,
+	botScoreBase = 500,
+	dScore = false,
+	scoreMult = 2,
+	scoreBase = 500,
+	scoreVal = false,
+	gcScore = false,
+	gcTiming = false,
+	winMult = 1,
+	promptInstant = true,
+	aDmg = true,
 	rel = function() end,
 	onAdd = nil,
 	regUi = nil,
@@ -313,8 +360,10 @@ local st = {
 	brpc = true,
 	mode = "normal",
 	aKick = true,
-	aMiss = false,
-	aDead = false,
+	aMiss = true,
+	aStat = true,
+	aRemote = true,
+	aDead = true,
 	autoDeleteLullaby = true,
 	matchEngine = nil,
 	inMode = "Virtual Input",
@@ -322,6 +371,66 @@ local st = {
 	adHum = nil,
 	adOrig = {}
 }
+
+local cap = {
+	firesignal = typeof(firesignal) == "function",
+	getgc = typeof(getgc) == "function",
+	hookfunction = typeof(hookfunction) == "function",
+	hookmetamethod = typeof(hookmetamethod) == "function",
+	newcclosure = typeof(newcclosure) == "function",
+	getnamecallmethod = typeof(getnamecallmethod) == "function",
+	checkcaller = typeof(checkcaller) == "function",
+	restorefunction = typeof(restorefunction) == "function"
+}
+cap.namecall = cap.hookmetamethod and cap.newcclosure and cap.getnamecallmethod
+
+if not cap.firesignal then
+	st.inMode = "Virtual Input"
+end
+
+if not cap.namecall then
+	st.aKick = false
+	st.aMiss = false
+	st.aStat = false
+	st.aRemote = false
+end
+
+if not cap.getgc then
+	st.gcScore = false
+	st.gcTiming = false
+end
+
+local function capText(name, ok)
+	return name .. ": " .. (ok and "yes" or "no")
+end
+
+local patchNetworkFire
+local applyTimingWindows
+local boostScoreValue
+local applyScoreValue
+local bindScoreValue
+local bumpBotScore
+local gcScanReport
+local gcState = {
+	netPatched = false,
+	netClient = nil,
+	netOld = nil,
+	netFire = nil,
+	netMode = nil,
+	timing = {},
+	timingBase = {}
+}
+local scoreState = {
+	val = nil,
+	conn = nil,
+	busy = false,
+	base = 0,
+	hitGain = 0,
+	shown = 0,
+	lastKey = nil,
+	lastTime = 0
+}
+
 runtimeState.cleanup = function()
 	if not runtimeState.alive then
 		return
@@ -330,6 +439,11 @@ runtimeState.cleanup = function()
 	st.auto = false
 	pcall(st.rel)
 	connections:disconnect()
+	pcall(function()
+		if type(runtimeState.gcClean) == "function" then
+			runtimeState.gcClean()
+		end
+	end)
 	for key, conn in pairs(watchers) do
 		if typeof(conn) == "RBXScriptConnection" then
 			pcall(function()
@@ -337,6 +451,22 @@ runtimeState.cleanup = function()
 			end)
 			watchers[key] = nil
 		end
+	end
+	for humanoid, state in pairs(st.adOrig) do
+		if humanoid and humanoid:IsA("Humanoid") then
+			pcall(function()
+				humanoid.MaxHealth = state.maxHealth or 100
+			end)
+			if state.breakJointsOnDeath ~= nil then
+				pcall(function()
+					humanoid.BreakJointsOnDeath = state.breakJointsOnDeath
+				end)
+			end
+			pcall(function()
+				humanoid:SetStateEnabled(Enum.HumanoidStateType.Dead, true)
+			end)
+		end
+		st.adOrig[humanoid] = nil
 	end
 	if runtimeEnv.__FNBPlayerRuntime == runtimeState then
 		runtimeEnv.__FNBPlayerRuntime = nil
@@ -347,7 +477,7 @@ runtimeState.cleanup = function()
 		end
 	end)
 end
-if typeof(firesignal) ~= "function" then
+if not cap.firesignal then
 	st.inMode = "Virtual Input"
 end
 
@@ -359,21 +489,48 @@ if typeof(getrenv) == "function" then
 	end
 end
 
-connections:add(svc.run.RenderStepped, function()
-	if not gEnv then
-		return
+local function lastInputMode()
+	if st.inMode == "firesignal" then
+		return Enum.UserInputType.Touch, "Mobile"
+	end
+	return Enum.UserInputType.Keyboard, "Computer"
+end
+
+local function forceLastInput()
+	local wanted, device = lastInputMode()
+	local li
+	pcall(function()
+		li = rawget(_G, "LastInput")
+	end)
+	if not li and gEnv then
+		pcall(function()
+			li = rawget(gEnv, "LastInput")
+		end)
+	end
+	if type(li) == "table" then
+		pcall(function()
+			li.Value = wanted
+		end)
+		pcall(function()
+			local env = getfenv(li.Value)
+			if type(env) == "table" then
+				local s = rawget(env, "script")
+				local dv = s and s:FindFirstChild("Device")
+				if dv and dv:IsA("StringValue") then
+					dv.Value = device
+				end
+			end
+		end)
 	end
 	pcall(function()
-		local li = gEnv.LastInput
-		if li then
-			if st.inMode == "firesignal" then
-				li.Value = Enum.UserInputType.Touch
-			else
-				li.Value = Enum.UserInputType.Keyboard
-			end
+		local fnf = PlayerGui:FindFirstChild("FNFEngine")
+		local eng = fnf and fnf:FindFirstChild("Engine")
+		local dv = eng and eng:FindFirstChild("Device")
+		if dv and dv:IsA("StringValue") then
+			dv.Value = device
 		end
 	end)
-end)
+end
 
 
 local charKeyMap = {
@@ -558,7 +715,7 @@ local function guiClick(btn)
 			if node:IsA("GuiButton") then
 				return node
 			end
-			for _, child in ipairs(node:QueryDescendants("Instance")) do
+			for _, child in ipairs(getDesc(node)) do
 				if child:IsA("GuiButton") then
 					return child
 				end
@@ -569,7 +726,7 @@ local function guiClick(btn)
 	if not btn then
 		return
 	end
-	if typeof(firesignal) == "function" then
+	if cap.firesignal then
 		pcall(firesignal, btn.MouseButton1Down)
 		task.wait()
 		pcall(firesignal, btn.MouseButton1Click)
@@ -597,7 +754,7 @@ local function asClickable(node)
 	if node:IsA("GuiButton") then
 		return node
 	end
-	for _, child in ipairs(node:QueryDescendants("Instance")) do
+	for _, child in ipairs(getDesc(node)) do
 		if child:IsA("GuiButton") then
 			return child
 		end
@@ -622,7 +779,7 @@ local function findModButton(container, kind, name)
 			if clickable then
 				return clickable
 			end
-			for _, child in ipairs(bucket:QueryDescendants("Instance")) do
+			for _, child in ipairs(getDesc(bucket)) do
 				if normModKey(child.Name) == targetKey then
 					local btn = asClickable(child)
 					if btn then
@@ -740,7 +897,7 @@ local function calcOff(scrollSpeed)
 end
 
 local function pressMob(container, name)
-	if typeof(firesignal) ~= "function" then
+	if not cap.firesignal then
 		return
 	end
 	if not container then
@@ -756,7 +913,7 @@ local function pressMob(container, name)
 end
 
 local function relMob(container, name)
-	if typeof(firesignal) ~= "function" then
+	if not cap.firesignal then
 		return
 	end
 	if not container then
@@ -809,8 +966,10 @@ end
 
 local function playSeq(Holder, Arrow, keyCode, AutoCtx)
 	task.spawn(function()
-		local baseOffset = AutoCtx.baseOffset
-		task.wait(baseOffset + AutoCtx.offsetMs / 1000)
+		local delayTime = math.max(0, (AutoCtx.baseOffset or 0) + (AutoCtx.offsetMs or 0) / 1000)
+		if delayTime > 0 then
+			task.wait(delayTime)
+		end
 		if not AutoCtx.enabled then
 			return
 		end
@@ -824,20 +983,29 @@ local function playSeq(Holder, Arrow, keyCode, AutoCtx)
 		end
 		if AutoCtx.laneDown[Holder] then
 			AutoCtx.release(Holder.Name, keyCode)
-			AutoCtx.press(Holder.Name, keyCode)
-			AutoCtx.laneDown[Holder] = true
-		else
-			AutoCtx.press(Holder.Name, keyCode)
-			AutoCtx.laneDown[Holder] = true
+			task.wait(math.max(0, AutoCtx.tapMs or 0) / 1000)
 		end
+		AutoCtx.press(Holder.Name, keyCode)
+		if type(AutoCtx.botScore) == "function" then
+			pcall(AutoCtx.botScore, Holder.Name, Arrow)
+		end
+		AutoCtx.laneDown[Holder] = true
 		AutoCtx.laneCount[Holder] = (AutoCtx.laneCount[Holder] or 0) + 1
-		while Arrow and Arrow.Parent and Arrow.Visible and AutoCtx.enabled do
-			if not isHold(Arrow) then
-				break
+		local untilTime = os.clock() + math.max(0.05, AutoCtx.maxHold or 8)
+		if isHold(Arrow) then
+			while Arrow and Arrow.Parent and Arrow.Visible and AutoCtx.enabled and os.clock() <= untilTime do
+				if not isHold(Arrow) then
+					break
+				end
+				task.wait(math.max(0.005, AutoCtx.holdTick or 0.015))
 			end
-			task.wait()
+		else
+			task.wait(math.max(0, AutoCtx.tapMs or 35) / 1000)
 		end
-		AutoCtx.laneCount[Holder] = AutoCtx.laneCount[Holder] - 1
+		if AutoCtx.relMs and AutoCtx.relMs > 0 then
+			task.wait(AutoCtx.relMs / 1000)
+		end
+		AutoCtx.laneCount[Holder] = math.max((AutoCtx.laneCount[Holder] or 1) - 1, 0)
 		if AutoCtx.laneCount[Holder] <= 0 then
 			AutoCtx.laneCount[Holder] = 0
 			if AutoCtx.laneDown[Holder] then
@@ -1028,7 +1196,11 @@ local function restAd(humanoid)
 end
 
 local function killTd(remote)
-	if not remote or remote.Parent == nil or remote.Name ~= "TakeDamage" then
+	if not st.aDmg or not remote or remote.Parent == nil then
+		return
+	end
+	local name = tostring(remote.Name)
+	if name ~= "TakeDamage" and name ~= "Damage" and name ~= "DamagePlayer" then
 		return
 	end
 	pcall(function()
@@ -1280,24 +1452,67 @@ MainControls:AddInput("HitOffsetInput", {
 	end
 })
 
+MainControls:AddSlider("TapHoldMs", {
+	Text = "Tap hold",
+	Default = st.tapMs,
+	Min = 5,
+	Max = 250,
+	Rounding = 0,
+	Suffix = "ms",
+	Callback = function(v)
+		st.tapMs = math.clamp(tonumber(v) or 35, 5, 250)
+	end
+})
+
+MainControls:AddSlider("ReleaseDelayMs", {
+	Text = "Release delay",
+	Default = st.relMs,
+	Min = 0,
+	Max = 250,
+	Rounding = 0,
+	Suffix = "ms",
+	Callback = function(v)
+		st.relMs = math.clamp(tonumber(v) or 0, 0, 250)
+	end
+})
+
+MainControls:AddSlider("MaxHoldSeconds", {
+	Text = "Max hold watchdog",
+	Default = st.maxHold,
+	Min = 1,
+	Max = 30,
+	Rounding = 1,
+	Suffix = "s",
+	Callback = function(v)
+		st.maxHold = math.clamp(tonumber(v) or 8, 1, 30)
+	end
+})
+
+local inputModes = { "Virtual Input" }
+if cap.firesignal then
+	inputModes[#inputModes + 1] = "firesignal"
+end
+
 inModeDrop = MainControls:AddDropdown("InputMode", {
 	Text = "Input method",
-	Values = {
-		"Virtual Input",
-		"firesignal"
-	},
+	Values = inputModes,
 	Default = st.inMode,
 	Callback = function(opt)
 		local sel = typeof(opt) == "table" and opt[1] or opt or "Virtual Input"
-		if sel == "firesignal" and typeof(firesignal) ~= "function" then
+		if sel ~= "firesignal" then
+			sel = "Virtual Input"
+		end
+		if sel == "firesignal" and not cap.firesignal then
 			notify("Missing requirement", "firesignal is required for firesignal mode; using Virtual Input instead.", 6)
 			st.inMode = "Virtual Input"
 			if inModeDrop then
 				inModeDrop:SetValue("Virtual Input")
 			end
+			forceLastInput()
 			return
 		end
 		st.inMode = sel
+		forceLastInput()
 	end
 })
 
@@ -1351,19 +1566,190 @@ MiscControls:AddToggle("AutoDeleteLullaby", {
 	end
 })
 
-antiMissToggle = MiscControls:AddToggle("AntiMiss", {
-	Text = "Anti Miss",
-	Default = st.aMiss,
+MiscControls:AddToggle("HitOnHitNotes", {
+	Text = "Hit OnHit/Gimmick Notes",
+	Default = st.hitOnHit,
 	Callback = function(v)
-		st.aMiss = v and true or false
+		st.hitOnHit = v and true or false
 	end
 })
+
+MiscControls:AddToggle("HitPoisonNotes", {
+	Text = "Hit Poison/Hell Notes",
+	Default = st.hitPoison,
+	Callback = function(v)
+		st.hitPoison = v and true or false
+	end
+})
+
+MiscControls:AddButton("ExecutorSupportInfo", {
+	Text = "Show executor support",
+	Func = function()
+		notify("Executor support", table.concat({
+			capText("firesignal", cap.firesignal),
+			capText("hookmetamethod", cap.namecall),
+			capText("hookfunction", cap.hookfunction),
+			capText("getgc", cap.getgc)
+		}, "\n"), 6)
+	end
+})
+
+MiscControls:AddToggle("BotScoreFun", {
+	Text = "Bot Double Score",
+	Default = st.botScoreFun,
+	Callback = function(v)
+		st.botScoreFun = v and true or false
+	end
+})
+
+MiscControls:AddSlider("BotScoreMultiplier", {
+	Text = "Bot score multiplier",
+	Default = st.botScoreMult,
+	Min = 1,
+	Max = 50,
+	Rounding = 0,
+	Suffix = "x",
+	Callback = function(v)
+		st.botScoreMult = math.clamp(math.floor(tonumber(v) or 2), 1, 50)
+	end
+})
+
+MiscControls:AddSlider("BotScorePerHit", {
+	Text = "Bot score per hit",
+	Default = st.botScoreBase,
+	Min = 50,
+	Max = 10000,
+	Rounding = 0,
+	Suffix = " pts",
+	Callback = function(v)
+		st.botScoreBase = math.clamp(math.floor(tonumber(v) or 500), 50, 10000)
+	end
+})
+
+MiscControls:AddButton("TestBotScoreRF", {
+	Text = "Send bot score test",
+	Func = function()
+		if bumpBotScore then
+			bumpBotScore("Down")
+		end
+	end
+})
+
+if cap.getgc then
+	MiscControls:AddToggle("GCNetworkScoreHook", {
+		Text = "getgc Hit Replay Test",
+		Default = st.gcScore,
+		Callback = function(v)
+			st.gcScore = v and true or false
+			if st.gcScore and patchNetworkFire then
+				patchNetworkFire()
+			end
+		end
+	})
+
+	MiscControls:AddToggle("GCTimingWindows", {
+		Text = "getgc Timing Windows",
+		Default = st.gcTiming,
+		Callback = function(v)
+			st.gcTiming = v and true or false
+			if applyTimingWindows then
+				applyTimingWindows()
+			end
+		end
+	})
+
+	MiscControls:AddSlider("TimingWindowMultiplier", {
+		Text = "Timing window multiplier",
+		Default = st.winMult,
+		Min = 1,
+		Max = 25,
+		Rounding = 1,
+		Suffix = "x",
+		Callback = function(v)
+			st.winMult = math.clamp(tonumber(v) or 1, 1, 25)
+			if applyTimingWindows then
+				applyTimingWindows()
+			end
+		end
+	})
+
+	MiscControls:AddButton("GetGCClientScan", {
+		Text = "getgc client scan",
+		Func = function()
+			if gcScanReport then
+				gcScanReport()
+			end
+		end
+	})
+else
+	MiscControls:AddButton("GetGCUnavailableInfo", {
+		Text = "getgc options unavailable",
+		Func = function()
+			notify("getgc unavailable", "This executor does not expose getgc, so getgc-only options were hidden.", 5)
+		end
+	})
+end
+
+MiscControls:AddButton("Release stuck keys", {
+	Text = "Release stuck keys",
+	Func = function()
+		pcall(st.rel)
+	end
+})
+
+if cap.namecall then
+	antiMissToggle = MiscControls:AddToggle("AntiMiss", {
+		Text = "Anti Miss",
+		Default = st.aMiss,
+		Callback = function(v)
+			st.aMiss = v and true or false
+		end
+	})
+
+	MiscControls:AddToggle("SanitizeStats", {
+		Text = "Sanitize Stats",
+		Default = st.aStat,
+		Callback = function(v)
+			st.aStat = v and true or false
+		end
+	})
+
+	MiscControls:AddToggle("AntiRemoteChecks", {
+		Text = "Anti Remote Checks",
+		Default = st.aRemote,
+		Callback = function(v)
+			st.aRemote = v and true or false
+		end
+	})
+else
+	MiscControls:AddButton("HookedBypassUnavailableInfo", {
+		Text = "Hooked bypasses unavailable",
+		Func = function()
+			notify("Hooking unavailable", "Missing hookmetamethod, newcclosure, or getnamecallmethod.", 5)
+		end
+	})
+end
 
 deadTg = MiscControls:AddToggle("AntiDeath", {
 	Text = "Anti Death",
 	Default = st.aDead,
 	Callback = function(v)
 		setAd(v)
+	end
+})
+
+MiscControls:AddToggle("AntiDamageRemote", {
+	Text = cap.namecall and "Anti Damage Remote" or "Anti Damage Remote (local)",
+	Default = st.aDmg,
+	Callback = function(v)
+		st.aDmg = v and true or false
+		if st.aDmg then
+			local engGui = PlayerGui:FindFirstChild("FNFEngine")
+			local eng = engGui and engGui:FindFirstChild("Engine")
+			for _, obj in ipairs(getDesc(eng)) do
+				killTd(obj)
+			end
+		end
 	end
 })
 
@@ -1608,13 +1994,22 @@ end
 
 local scriptGroup = TabSettings:AddRightGroupbox("Script Controls")
 
-scriptGroup:AddToggle("AntiKick", {
-	Text = "Anti Kick",
-	Default = st.aKick,
-	Callback = function(v)
-		st.aKick = v and true or false
-	end
-})
+if cap.namecall then
+	scriptGroup:AddToggle("AntiKick", {
+		Text = "Anti Kick",
+		Default = st.aKick,
+		Callback = function(v)
+			st.aKick = v and true or false
+		end
+	})
+else
+	scriptGroup:AddButton("AntiKickUnavailableInfo", {
+		Text = "Anti Kick unavailable",
+		Func = function()
+			notify("Anti Kick unavailable", "This executor is missing namecall hook support.", 5)
+		end
+	})
+end
 
 brpcToggle = scriptGroup:AddToggle("BloxstrapRPC", {
 	Text = "Bloxstrap RPC",
@@ -1634,7 +2029,9 @@ scriptGroup:AddButton("Reload script", {
 		pcall(st.rel)
 		dropSw()
 		connections:disconnect()
-		st.regUi()
+		if type(st.regUi) == "function" then
+			pcall(st.regUi)
+		end
 		scan()
 		st.auto = true
 		notify("FNB", "Reloaded.", 4)
@@ -1644,12 +2041,9 @@ scriptGroup:AddButton("Reload script", {
 scriptGroup:AddButton("Unload script", {
 	Text = "Unload script",
 	Func = function()
-		st.auto = false
-		pcall(st.rel)
-		connections:disconnect()
-		pcall(function()
-			Obsidian:Unload()
-		end)
+		if type(runtimeState.cleanup) == "function" then
+			runtimeState.cleanup()
+		end
 	end
 })
 
@@ -1665,10 +2059,561 @@ ThemeManager:SetLibrary(Obsidian)
 ThemeManager:SetFolder("ltseverydayyou-fnb")
 ThemeManager:ApplyToTab(TabSettings)
 
-local function reqok()
-	return typeof(hookmetamethod) == "function" and typeof(newcclosure) == "function" and typeof(getnamecallmethod) == "function" and typeof(checkcaller) == "function"
+local function lowStr(v)
+	if typeof(v) == "buffer" then
+		local ok, s = pcall(buffer.tostring, v)
+		if ok and type(s) == "string" then
+			return s:lower()
+		end
+	elseif type(v) == "string" then
+		return v:lower()
+	elseif type(v) == "number" or type(v) == "boolean" then
+		return tostring(v):lower()
+	end
 end
 
+local function hasToken(v, words, seen, depth)
+	if depth > 4 then
+		return false
+	end
+	local s = lowStr(v)
+	if s then
+		for _, w in ipairs(words) do
+			if s:find(w, 1, true) then
+				return true
+			end
+		end
+	end
+	if type(v) ~= "table" then
+		return false
+	end
+	seen = seen or {}
+	if seen[v] then
+		return false
+	end
+	seen[v] = true
+	for k, val in pairs(v) do
+		if hasToken(k, words, seen, depth + 1) or hasToken(val, words, seen, depth + 1) then
+			return true
+		end
+	end
+	return false
+end
+
+local function findHitPayload(v, seen, depth)
+	if depth and depth > 5 then
+		return nil
+	end
+	if type(v) == "table" then
+		seen = seen or {}
+		if seen[v] then
+			return nil
+		end
+		seen[v] = true
+		local lane = rawget(v, 1)
+		local kind = rawget(v, 2)
+		local stamp = rawget(v, 3)
+		if (type(lane) == "string" or typeof(lane) == "EnumItem") and type(kind) == "number" and type(stamp) == "number" then
+			return v
+		end
+		for _, val in pairs(v) do
+			local found = findHitPayload(val, seen, (depth or 0) + 1)
+			if found then
+				return found
+			end
+		end
+	end
+	return nil
+end
+
+local function isHitCall(args)
+	local hasHit = false
+	for _, v in ipairs(args) do
+		if type(v) == "string" and v:lower() == "hit" then
+			hasHit = true
+			break
+		end
+	end
+	if not hasHit then
+		return false, nil
+	end
+	local payload = findHitPayload(args, nil, 0)
+	if not payload then
+		return false, nil
+	end
+	return true, payload
+end
+
+local function tablePack(...)
+	local t = { ... }
+	t.n = select("#", ...)
+	return t
+end
+
+local function gcList(includeTables)
+	if typeof(getgc) ~= "function" then
+		return {}
+	end
+	local ok, res = pcall(getgc, includeTables)
+	if ok and type(res) == "table" then
+		return res
+	end
+	return {}
+end
+
+local function findNetworkClient()
+	local okMod, net = pcall(function()
+		return require(svc.rs:WaitForChild("Modules"):WaitForChild("Network"))
+	end)
+	if okMod and type(net) == "table" and type(rawget(net, "Client")) == "table" and type(rawget(rawget(net, "Client"), "Fire")) == "function" then
+		return rawget(net, "Client"), "require"
+	end
+	for _, obj in ipairs(gcList(true)) do
+		if type(obj) == "table" then
+			local client = rawget(obj, "Client")
+			if type(client) == "table" and type(rawget(client, "Fire")) == "function" then
+				return client, "getgc"
+			end
+			if type(rawget(obj, "Fire")) == "function" and type(rawget(obj, "Subscribe")) == "function" then
+				return obj, "getgc"
+			end
+		end
+	end
+end
+
+local netReplayBusy = false
+patchNetworkFire = function()
+	if gcState.netPatched then
+		return true
+	end
+	local client, src = findNetworkClient()
+	if not client then
+		notify("Double Score", "Could not find Network.Client with require/getgc.", 6)
+		return false
+	end
+	local fire = rawget(client, "Fire")
+	if type(fire) ~= "function" then
+		notify("Double Score", "Network.Client.Fire is missing.", 6)
+		return false
+	end
+	local function wrapped(oldFire, ...)
+		if netReplayBusy or not st.dScore then
+			return oldFire(...)
+		end
+		local args = { ... }
+		local okHit, payload = isHitCall(args)
+		if not okHit or not payload or tonumber(payload[2]) ~= 0 then
+			return oldFire(...)
+		end
+		local mult = math.clamp(math.floor(tonumber(st.scoreMult) or 2), 2, 50)
+		netReplayBusy = true
+		local ret = tablePack(oldFire(...))
+		if boostScoreValue then
+			boostScoreValue(payload)
+		end
+		for _ = 2, mult do
+			pcall(function()
+				oldFire(table.unpack(args))
+			end)
+		end
+		netReplayBusy = false
+		return table.unpack(ret, 1, ret.n)
+	end
+	gcState.netClient = client
+	gcState.netFire = fire
+	gcState.netMode = src
+	if cap.hookfunction then
+		local oldFire
+		local okHook, hookErr = pcall(function()
+			oldFire = hookfunction(fire, function(...)
+				return wrapped(oldFire, ...)
+			end)
+		end)
+		if okHook and type(oldFire) == "function" then
+			gcState.netOld = oldFire
+			gcState.netPatched = true
+			notify("Double Score", "Hooked Network.Client.Fire through " .. tostring(src) .. ".", 4)
+			return true
+		end
+		warn("[FNB] hookfunction failed for Network.Client.Fire: " .. tostring(hookErr))
+	end
+	local okSet = pcall(function()
+		client.Fire = function(...)
+			return wrapped(fire, ...)
+		end
+	end)
+	if okSet then
+		gcState.netOld = fire
+		gcState.netPatched = true
+		notify("Double Score", "Wrapped Network.Client.Fire through " .. tostring(src) .. ".", 4)
+		return true
+	end
+	notify("Double Score", "hookfunction is missing and direct wrap failed.", 6)
+	return false
+end
+
+local timingKeys = {
+	"Marvelous",
+	"Sick",
+	"Good",
+	"Ok",
+	"Bad"
+}
+
+local function isTimingTable(t)
+	if type(t) ~= "table" then
+		return false
+	end
+	for _, key in ipairs(timingKeys) do
+		if type(rawget(t, key)) ~= "number" then
+			return false
+		end
+	end
+	return true
+end
+
+local function addTimingTable(t)
+	if not isTimingTable(t) or gcState.timingBase[t] then
+		return
+	end
+	gcState.timing[#gcState.timing + 1] = t
+	local base = {}
+	for _, key in ipairs(timingKeys) do
+		base[key] = rawget(t, key)
+	end
+	gcState.timingBase[t] = base
+end
+
+local function findTimingTables()
+	local okMod, mod = pcall(function()
+		return require(svc.rs:WaitForChild("Modules"):WaitForChild("TimingWindows"))
+	end)
+	if okMod then
+		addTimingTable(mod)
+	end
+	for _, obj in ipairs(gcList(true)) do
+		addTimingTable(obj)
+	end
+	return #gcState.timing
+end
+
+applyTimingWindows = function()
+	findTimingTables()
+	local mult = st.gcTiming and math.clamp(tonumber(st.winMult) or 1, 1, 25) or 1
+	for tbl, base in pairs(gcState.timingBase) do
+		if type(tbl) == "table" and type(base) == "table" then
+			for _, key in ipairs(timingKeys) do
+				if type(base[key]) == "number" then
+					pcall(function()
+						tbl[key] = base[key] * mult
+					end)
+				end
+			end
+		end
+	end
+	return #gcState.timing
+end
+
+gcScanReport = function()
+	local total = 0
+	local tables = 0
+	local funcs = 0
+	local network = 0
+	local timing = 0
+	local suspicious = 0
+	local words = {
+		"kick",
+		"miss",
+		"damage",
+		"death",
+		"anticheat",
+		"inputcheck",
+		"userinputasync"
+	}
+	for _, obj in ipairs(gcList(true)) do
+		total += 1
+		local typ = type(obj)
+		if typ == "table" then
+			tables += 1
+			if isTimingTable(obj) then
+				timing += 1
+			end
+			if type(rawget(obj, "Fire")) == "function" or type(rawget(obj, "Client")) == "table" then
+				network += 1
+			end
+			if hasToken(obj, words, nil, 0) then
+				suspicious += 1
+			end
+		elseif typ == "function" then
+			funcs += 1
+		end
+	end
+	notify("getgc scan", string.format("objects=%d | tables=%d | funcs=%d | network-ish=%d | timing=%d | watched=%d", total, tables, funcs, network, timing, suspicious), 8)
+end
+
+local function ownScoreValue()
+	local eng = st.matchEngine
+	if not eng or not eng.Parent then
+		local gui = PlayerGui:FindFirstChild("FNFEngine")
+		eng = gui and gui:FindFirstChild("Engine")
+	end
+	if not eng then
+		return nil
+	end
+	local stgObj = eng:FindFirstChild("Stage")
+	local stage = stgObj and stgObj.Value
+	local cfg = stage and stage:FindFirstChild("Config")
+	if not cfg then
+		return nil
+	end
+	local p1 = cfg:FindFirstChild("Player1")
+	local own = p1 and p1.Value == Client and cfg:FindFirstChild("P1Points") or cfg:FindFirstChild("P2Points")
+	if own and (own:IsA("NumberValue") or own:IsA("IntValue")) then
+		return own
+	end
+end
+
+local function quotedBuf(v)
+	local str = tostring(v or "")
+	str = "\"" .. str:gsub("\\", "\\\\"):gsub("\"", "\\\"") .. "\""
+	if type(buffer) == "table" and type(buffer.fromstring) == "function" then
+		local ok, res = pcall(buffer.fromstring, str)
+		if ok then
+			return res
+		end
+	end
+	return str
+end
+
+local function rawBuf(v)
+	local str = tostring(v or "")
+	if type(buffer) == "table" and type(buffer.fromstring) == "function" then
+		local ok, res = pcall(buffer.fromstring, str)
+		if ok then
+			return res
+		end
+	end
+	return str
+end
+
+bumpBotScore = function(lane)
+	if not st.botScoreFun then
+		return
+	end
+	local base = math.clamp(math.floor(tonumber(st.botScoreBase) or 500), 50, 10000)
+	local mult = math.clamp(math.floor(tonumber(st.botScoreMult) or 2), 1, 50)
+	local score = math.floor(base * mult + 0.5)
+	local rating = "Sick"
+	local dir = tostring(lane or "Down")
+	task.spawn(function()
+		local ok, err = pcall(function()
+			RF:InvokeServer("UserInputAsync" .. Client.Name, {
+				quotedBuf("Bot"),
+				{
+					quotedBuf(rating),
+					rawBuf(score),
+					quotedBuf(dir)
+				}
+			})
+		end)
+		if not ok then
+			notify("Bot score RF", tostring(err), 4)
+		end
+	end)
+end
+
+local function resetScoreState(v)
+	scoreState.base = tonumber(v) or 0
+	scoreState.hitGain = 0
+	scoreState.shown = scoreState.base
+	scoreState.lastKey = nil
+	scoreState.lastTime = 0
+end
+
+applyScoreValue = function()
+	local val = ownScoreValue()
+	if not val then
+		return false
+	end
+	if scoreState.val ~= val then
+		if typeof(scoreState.conn) == "RBXScriptConnection" then
+			pcall(function()
+				scoreState.conn:Disconnect()
+			end)
+		end
+		scoreState.val = val
+		resetScoreState(val.Value)
+		scoreState.conn = val.Changed:Connect(function(nv)
+			if scoreState.busy then
+				return
+			end
+			nv = tonumber(nv) or tonumber(val.Value) or 0
+			if nv <= 0 or nv + 5 < scoreState.base then
+				resetScoreState(nv)
+				return
+			end
+			local realBase = nv - (scoreState.hitGain * (math.clamp(math.floor(tonumber(st.scoreMult) or 2), 2, 50) - 1))
+			if realBase > scoreState.base then
+				scoreState.base = realBase
+			end
+			if st.dScore and st.scoreVal and scoreState.hitGain > 0 then
+				task.defer(applyScoreValue)
+			end
+		end)
+	end
+	if not (st.dScore and st.scoreVal) then
+		return true
+	end
+	local mult = math.clamp(math.floor(tonumber(st.scoreMult) or 2), 2, 50)
+	local desired = math.floor(scoreState.base + scoreState.hitGain * (mult - 1) + 0.5)
+	if desired > tonumber(val.Value) then
+		scoreState.busy = true
+		pcall(function()
+			val.Value = desired
+		end)
+		scoreState.busy = false
+		scoreState.shown = desired
+	end
+	return true
+end
+
+bindScoreValue = function()
+	return applyScoreValue()
+end
+
+boostScoreValue = function(payload)
+	if not (st.dScore and st.scoreVal) then
+		return
+	end
+	if payload and tonumber(payload[2]) ~= 0 then
+		return
+	end
+	if payload then
+		local key = tostring(payload[1]) .. "|" .. tostring(payload[3]) .. "|" .. tostring(payload[6])
+		local now = tick()
+		if scoreState.lastKey == key and now - scoreState.lastTime < 0.75 then
+			return
+		end
+		scoreState.lastKey = key
+		scoreState.lastTime = now
+	end
+	local val = ownScoreValue()
+	if not val then
+		return
+	end
+	if scoreState.val ~= val then
+		applyScoreValue()
+	end
+	local cur = tonumber(val.Value) or 0
+	local mult = math.clamp(math.floor(tonumber(st.scoreMult) or 2), 2, 50)
+	local bonus = scoreState.hitGain * (mult - 1)
+	local realBase = cur - bonus
+	if realBase > scoreState.base then
+		scoreState.base = realBase
+	end
+	local gain = math.clamp(math.floor(tonumber(st.scoreBase) or 500), 50, 10000)
+	if cur <= scoreState.shown and realBase <= scoreState.base + 1 then
+		scoreState.base = scoreState.base + gain
+	else
+		scoreState.base = math.max(scoreState.base, realBase)
+	end
+	scoreState.hitGain = scoreState.hitGain + gain
+	task.defer(applyScoreValue)
+	task.delay(0.05, applyScoreValue)
+	task.delay(0.15, applyScoreValue)
+end
+
+runtimeState.gcClean = function()
+	if gcState.netPatched and gcState.netClient and gcState.netOld then
+		pcall(function()
+			if cap.restorefunction and gcState.netFire then
+				restorefunction(gcState.netFire)
+			elseif type(gcState.netClient) == "table" then
+				gcState.netClient.Fire = gcState.netOld
+			end
+		end)
+	end
+	gcState.netPatched = false
+	if typeof(scoreState.conn) == "RBXScriptConnection" then
+		pcall(function()
+			scoreState.conn:Disconnect()
+		end)
+	end
+	scoreState.conn = nil
+	scoreState.val = nil
+	for tbl, base in pairs(gcState.timingBase) do
+		if type(tbl) == "table" and type(base) == "table" then
+			for _, key in ipairs(timingKeys) do
+				pcall(function()
+					tbl[key] = base[key]
+				end)
+			end
+		end
+	end
+end
+
+local scoreReplayBusy = false
+local function replayScoreHits(oldNamecall, self, method, args)
+	if scoreReplayBusy or not st.dScore then
+		return false
+	end
+	local okHit, payload = isHitCall(args)
+	if not okHit then
+		return false
+	end
+	if payload and tonumber(payload[2]) ~= 0 then
+		return false
+	end
+	local mult = math.clamp(math.floor(tonumber(st.scoreMult) or 2), 2, 50)
+	local extra = mult - 1
+	if extra <= 0 then
+		return false
+	end
+	scoreReplayBusy = true
+	local ret = table.pack(oldNamecall(self, table.unpack(args)))
+	if boostScoreValue then
+		boostScoreValue(payload)
+	end
+	for _ = 1, extra do
+		pcall(function()
+			oldNamecall(self, table.unpack(args))
+		end)
+	end
+	scoreReplayBusy = false
+	return true, table.unpack(ret, 1, ret.n)
+end
+
+local function patchStatsPayload(args)
+	if not st.aStat then
+		return args
+	end
+	for _, v in ipairs(args) do
+		if type(v) == "table" then
+			if v.misses ~= nil then
+				v.misses = 0
+			end
+			if v.accuracy ~= nil then
+				v.accuracy = 100
+			end
+			if v.bot ~= nil then
+				v.bot = false
+			end
+		end
+	end
+	return args
+end
+
+local function reqok()
+	return cap.namecall == true
+end
+
+local function isExecCall()
+	if not cap.checkcaller then
+		return false
+	end
+	local ok, res = pcall(checkcaller)
+	return ok and res == true
+end
 
 local function notifyMissing(t, c)
 	notify(t, c, 7)
@@ -1678,7 +2623,7 @@ do
 	local miss = false
 	if not reqok() then
 		miss = true
-		notifyMissing("Missing requirement", "hookmetamethod/newcclosure/getnamecallmethod/checkcaller")
+		notifyMissing("Missing requirement", "hookmetamethod/newcclosure/getnamecallmethod")
 	end
 	if miss then
 		notifyMissing("FNB Autoplayer", "One or more requirements are missing; functionality may be limited.")
@@ -1696,45 +2641,63 @@ do
 		-- 	end
 		-- 	return oldIndex(self, m)
 		-- end)
-		oldNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
+		local okNamecall, namecallErr
+		okNamecall, namecallErr = pcall(function()
+			oldNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
 			local l = (getnamecallmethod() or ""):lower()
-			if not checkcaller() then
+			if not isExecCall() then
 				if st.aKick and self == Client and l == "kick" then
 					return
 				end
 				if typeof(self) == "Instance" and (l == "fireserver" or l == "invokeserver") then
 					local name = tostring(self.Name)
-					-- if name:lower() == "userinputasync" then
-					-- 	return
-					-- end
-					-- if self == TakeDamageRemote then
-					-- 	return
-					-- end
-					-- if name == "TakeDamage" and self.Parent and self.Parent.Name == "Engine" then
-					-- 	return
-					-- end
-					if self == RF and st.aMiss then
-						local args = { ... }
-						local payload = args[2]
-						if typeof(payload) == "table" then
-							local stateBuf = payload[1]
-							if typeof(stateBuf) == "buffer" then
-								local state = buffer.tostring(stateBuf)
-								if state and state:find("Miss") then
-									return
-								end
-							end
-						end
+					local low = name:lower()
+					local args = { ... }
+					local scoreDone, r1, r2, r3, r4, r5 = replayScoreHits(oldNamecall, self, l, args)
+					if scoreDone then
+						return r1, r2, r3, r4, r5
+					end
+					if st.aRemote and (low:find("userinputasync", 1, true) or low == "inputcheck" or low == "ac" or low == "anticheat") then
+						return
+					end
+					if st.aDmg and (low == "takedamage" or low == "damage" or low == "damageplayer" or hasToken(args, { "takedamage", "damageplayer" }, nil, 0)) then
+						return
+					end
+					if st.aDead and hasToken(args, { "death", "dead", "kill", "health=0" }, nil, 0) then
+						return
+					end
+					if st.aMiss and hasToken(args, { "miss", "onmiss", "missed" }, nil, 0) then
+						return
+					end
+					if st.aStat and (low == "updatedata" or low == "stats" or low == "score") then
+						patchStatsPayload(args)
 						return oldNamecall(self, table.unpack(args))
 					end
 				end
 			end
 			return oldNamecall(self, ...)
 		end))
+		end)
+		if not okNamecall then
+			warn("[FNB] hookmetamethod failed: " .. tostring(namecallErr))
+		end
 	end
 end
 
+task.defer(function()
+	if st.gcScore and patchNetworkFire then
+		patchNetworkFire()
+	end
+	if applyTimingWindows then
+		applyTimingWindows()
+	end
+	if bindScoreValue then
+		bindScoreValue()
+	end
+end)
+
 st.onAdd = function(Object)
+	pcall(st.rel)
 	if not Object or Object.Name ~= "FNFEngine" then
 		scan()
 		return
@@ -1763,7 +2726,10 @@ st.onAdd = function(Object)
 	local function Filter(iter, fn)
 		local t = {}
 		for _, v in pairs(iter) do
-			t[#t + 1] = fn(v)
+			local res = fn(v)
+			if res ~= nil then
+				t[#t + 1] = res
+			end
 		end
 		return t
 	end
@@ -1773,6 +2739,9 @@ st.onAdd = function(Object)
 	end
 	local Song = Stage.Config.Song.Value
 	st.matchEngine = Engine
+	if bindScoreValue then
+		bindScoreValue()
+	end
 	syncLullabyPurge(Engine)
 	local PoisonNotes
 	local scrollSpeed = Input.ScrollSpeedChange.Value and Input.ScrollSpeed.Value or (function()
@@ -1882,10 +2851,15 @@ st.onAdd = function(Object)
 		enabled = true,
 		offsetMs = st.off,
 		baseOffset = baseOffset,
+		tapMs = st.tapMs,
+		relMs = st.relMs,
+		holdTick = st.holdTick,
+		maxHold = st.maxHold,
 		laneDown = laneDown,
 		laneCount = laneCount,
 		press = pressLane,
-		release = releaseLane
+		release = releaseLane,
+		botScore = bumpBotScore
 	}
 
 	connections:add(Input.ScrollSpeed.Changed, function()
@@ -1901,10 +2875,10 @@ st.onAdd = function(Object)
 				end
 				local arrowName = tostring(Arrow.Name or "")
 				local isOrange = arrowName:find("_OrangeNote", 1, true) ~= nil
-				if Arrow:FindFirstChild("HellNote") and Arrow.HellNote.Value and PoisonNotes and not isOrange then
+				if not st.hitPoison and Arrow:FindFirstChild("HellNote") and Arrow.HellNote.Value and PoisonNotes and not isOrange then
 					return
 				end
-				if not isOrange and IsOnHit(Arrow:FindFirstChildOfClass("ModuleScript")) then
+				if not st.hitOnHit and not isOrange and IsOnHit(Arrow:FindFirstChildOfClass("ModuleScript")) then
 					return
 				end
 				local keyCode = Session[Holder.Name]
@@ -1916,6 +2890,10 @@ st.onAdd = function(Object)
 				end
 				AutoCtx.enabled = st.auto
 				AutoCtx.offsetMs = st.off
+				AutoCtx.tapMs = st.tapMs
+				AutoCtx.relMs = st.relMs
+				AutoCtx.holdTick = st.holdTick
+				AutoCtx.maxHold = st.maxHold
 				AutoCtx.baseOffset = calcOff(Input.ScrollSpeedChange.Value and Input.ScrollSpeed.Value or 1)
 				playSeq(Holder, Arrow, keyCode, AutoCtx)
 			end)
@@ -1924,6 +2902,8 @@ st.onAdd = function(Object)
 end
 
 st.regUi = function()
+	connections:add(svc.run.Heartbeat, forceLastInput)
+	forceLastInput()
 	connections:add(Client.CharacterAdded, function(char)
 		task.spawn(function()
 			local humanoid = char and (char:FindFirstChildOfClass("Humanoid") or char:WaitForChild("Humanoid", 10))
@@ -1982,7 +2962,9 @@ st.regUi = function()
 	end)
 	connections:add(PlayerGui.ChildRemoved, function(o)
 		if o and o.Name == "FNFEngine" then
+			pcall(st.rel)
 			st.matchEngine = nil
+			resetScoreState(0)
 			syncLullabyPurge(nil)
 			scan()
 		end
@@ -1998,11 +2980,21 @@ st.regUi = function()
 			end
 		end)
 	end)
+	connections:add(workspace.DescendantAdded, function(o)
+		if o and o.ClassName == "ProximityPrompt" then
+			pcall(function()
+				o.HoldDuration = 0
+			end)
+		end
+	end)
 	local existingEngine = PlayerGui:FindFirstChild("FNFEngine")
 	if existingEngine then
 		applyMods(true)
 		local engine = existingEngine:FindFirstChild("Engine")
 		if engine then
+			for _, td in ipairs(getDesc(engine)) do
+				killTd(td)
+			end
 			local td = engine:FindFirstChild("TakeDamage")
 			if td then
 				killTd(td)
@@ -2030,9 +3022,11 @@ end
 st.regUi()
 scan()
 
-for _, v in pairs(workspace:QueryDescendants("Instance")) do
+for _, v in pairs(getDesc(workspace)) do
 	if v.ClassName == "ProximityPrompt" then
-		v.HoldDuration = 0
+		pcall(function()
+			v.HoldDuration = 0
+		end)
 	end
 end
 
