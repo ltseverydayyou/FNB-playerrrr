@@ -50,7 +50,7 @@ local connections = {
 		return conn
 	end,
 	disconnect = function(self)
-		for _, v in pairs(self._list) do
+		for _, v in self._list do
 			if typeof(v) == "RBXScriptConnection" then
 				pcall(function()
 					v:Disconnect()
@@ -498,13 +498,13 @@ fn.actorObj = function()
 	if not okA or type(actors) ~= "table" then
 		return nil
 	end
-	for _, obj in ipairs(actors) do
+	for _, obj in actors do
 		if typeof(obj) == "Instance" and obj:IsA("Actor") and obj.Parent then
 			actorState.obj = obj
 			return obj
 		end
 	end
-	for _, obj in ipairs(actors) do
+	for _, obj in actors do
 		if obj ~= nil then
 			actorState.obj = obj
 			return obj
@@ -594,7 +594,7 @@ runtimeState.cleanup = function()
 			runtimeState.gcClean()
 		end
 	end)
-	for key, conn in pairs(watchers) do
+	for key, conn in watchers do
 		if typeof(conn) == "RBXScriptConnection" then
 			pcall(function()
 				conn:Disconnect()
@@ -603,7 +603,7 @@ runtimeState.cleanup = function()
 		end
 	end
 	fn.actorReset(true)
-	for humanoid, state in pairs(st.adOrig) do
+	for humanoid, state in st.adOrig do
 		if humanoid and humanoid:IsA("Humanoid") then
 			pcall(function()
 				humanoid.MaxHealth = state.maxHealth or 100
@@ -766,10 +766,10 @@ local applyModsTok = 0
 local modTok = {}
 
 fn.initModState = function()
-	for kind, names in pairs(ModifierList) do
+	for kind, names in ModifierList do
 		modState[kind] = modState[kind] or {}
 		local bucket = modState[kind]
-		for _, name in ipairs(names) do
+		for _, name in names do
 			if bucket[name] == nil then
 				bucket[name] = false
 			end
@@ -866,7 +866,7 @@ fn.guiClick = function(btn)
 			if node:IsA("GuiButton") then
 				return node
 			end
-			for _, child in ipairs(fn.getDesc(node)) do
+			for _, child in fn.getDesc(node) do
 				if child:IsA("GuiButton") then
 					return child
 				end
@@ -905,7 +905,7 @@ fn.asClickable = function(node)
 	if node:IsA("GuiButton") then
 		return node
 	end
-	for _, child in ipairs(fn.getDesc(node)) do
+	for _, child in fn.getDesc(node) do
 		if child:IsA("GuiButton") then
 			return child
 		end
@@ -923,14 +923,14 @@ fn.findModButton = function(container, kind, name)
 		container:FindFirstChild(kind .. "Modifiers"),
 		container
 	}
-	for _, bucket in ipairs(buckets) do
+	for _, bucket in buckets do
 		if bucket then
 			local direct = bucket:FindFirstChild(name)
 			local clickable = fn.asClickable(direct)
 			if clickable then
 				return clickable
 			end
-			for _, child in ipairs(fn.getDesc(bucket)) do
+			for _, child in fn.getDesc(bucket) do
 				if fn.normModKey(child.Name) == targetKey then
 					local btn = fn.asClickable(child)
 					if btn then
@@ -1021,10 +1021,10 @@ fn.applyMods = function(force)
 		if not fn.engineReady() then
 			return
 		end
-		for kind, names in pairs(ModifierList) do
+		for kind, names in ModifierList do
 			local flags = AutoModFlags[kind]
 			local stateBucket = modState[kind]
-			for _, name in ipairs(names) do
+			for _, name in names do
 				local desired = false
 				if flags then
 					desired = flags[name] and true or false
@@ -1188,7 +1188,7 @@ fn.syncLullabyPurge = function(engine)
 			return
 		end
 		fn.killLullabyChild(engine:FindFirstChild("background"))
-		for _, child in ipairs(engine:GetChildren()) do
+		for _, child in engine:GetChildren() do
 			fn.killLullabyChild(child)
 		end
 	end)
@@ -1361,10 +1361,10 @@ fn.setAd = function(enabled)
 		return
 	end
 	local restoreList = {}
-	for humanoid in pairs(st.adOrig) do
+	for humanoid in st.adOrig do
 		restoreList[#restoreList + 1] = humanoid
 	end
-	for _, humanoid in ipairs(restoreList) do
+	for _, humanoid in restoreList do
 		fn.restAd(humanoid)
 	end
 end
@@ -1894,7 +1894,7 @@ MiscControls:AddToggle("AntiDamageRemote", {
 		if st.aDmg then
 			local engGui = PlayerGui:FindFirstChild("FNFEngine")
 			local eng = engGui and engGui:FindFirstChild("Engine")
-			for _, obj in ipairs(fn.getDesc(eng)) do
+			for _, obj in fn.getDesc(eng) do
 				fn.killTd(obj)
 			end
 		end
@@ -2240,7 +2240,7 @@ fn.hasToken = function(v, words, seen, depth)
 	end
 	local s = fn.lowStr(v)
 	if s then
-		for _, w in ipairs(words) do
+		for _, w in words do
 			if s:find(w, 1, true) then
 				return true
 			end
@@ -2254,7 +2254,7 @@ fn.hasToken = function(v, words, seen, depth)
 		return false
 	end
 	seen[v] = true
-	for k, val in pairs(v) do
+	for k, val in v do
 		if fn.hasToken(k, words, seen, depth + 1) or fn.hasToken(val, words, seen, depth + 1) then
 			return true
 		end
@@ -2278,7 +2278,7 @@ fn.findHitPayload = function(v, seen, depth)
 		if (type(lane) == "string" or typeof(lane) == "EnumItem") and type(kind) == "number" and type(stamp) == "number" then
 			return v
 		end
-		for _, val in pairs(v) do
+		for _, val in v do
 			local found = fn.findHitPayload(val, seen, (depth or 0) + 1)
 			if found then
 				return found
@@ -2290,7 +2290,7 @@ end
 
 fn.isHitCall = function(args)
 	local hasHit = false
-	for _, v in ipairs(args) do
+	for _, v in args do
 		if type(v) == "string" and v:lower() == "hit" then
 			hasHit = true
 			break
@@ -2330,7 +2330,7 @@ fn.findNetworkClient = function()
 	if okMod and type(net) == "table" and type(rawget(net, "Client")) == "table" and type(rawget(rawget(net, "Client"), "Fire")) == "function" then
 		return rawget(net, "Client"), "require"
 	end
-	for _, obj in ipairs(fn.gcList(true)) do
+	for _, obj in fn.gcList(true) do
 		if type(obj) == "table" then
 			local client = rawget(obj, "Client")
 			if type(client) == "table" and type(rawget(client, "Fire")) == "function" then
@@ -2426,7 +2426,7 @@ fn.isTimingTable = function(t)
 	if type(t) ~= "table" then
 		return false
 	end
-	for _, key in ipairs(timingKeys) do
+	for _, key in timingKeys do
 		if type(rawget(t, key)) ~= "number" then
 			return false
 		end
@@ -2440,7 +2440,7 @@ fn.addTimingTable = function(t)
 	end
 	gcState.timing[#gcState.timing + 1] = t
 	local base = {}
-	for _, key in ipairs(timingKeys) do
+	for _, key in timingKeys do
 		base[key] = rawget(t, key)
 	end
 	gcState.timingBase[t] = base
@@ -2453,7 +2453,7 @@ fn.findTimingTables = function()
 	if okMod then
 		fn.addTimingTable(mod)
 	end
-	for _, obj in ipairs(fn.gcList(true)) do
+	for _, obj in fn.gcList(true) do
 		fn.addTimingTable(obj)
 	end
 	return #gcState.timing
@@ -2462,9 +2462,9 @@ end
 applyTimingWindows = function()
 	fn.findTimingTables()
 	local mult = st.gcTiming and math.clamp(tonumber(st.winMult) or 1, 1, 25) or 1
-	for tbl, base in pairs(gcState.timingBase) do
+	for tbl, base in gcState.timingBase do
 		if type(tbl) == "table" and type(base) == "table" then
-			for _, key in ipairs(timingKeys) do
+			for _, key in timingKeys do
 				if type(base[key]) == "number" then
 					pcall(function()
 						tbl[key] = base[key] * mult
@@ -2492,7 +2492,7 @@ gcScanReport = function()
 		"inputcheck",
 		"userinputasync"
 	}
-	for _, obj in ipairs(fn.gcList(true)) do
+	for _, obj in fn.gcList(true) do
 		total += 1
 		local typ = type(obj)
 		if typ == "table" then
@@ -2703,9 +2703,9 @@ runtimeState.gcClean = function()
 	end
 	scoreState.conn = nil
 	scoreState.val = nil
-	for tbl, base in pairs(gcState.timingBase) do
+	for tbl, base in gcState.timingBase do
 		if type(tbl) == "table" and type(base) == "table" then
-			for _, key in ipairs(timingKeys) do
+			for _, key in timingKeys do
 				pcall(function()
 					tbl[key] = base[key]
 				end)
@@ -2749,7 +2749,7 @@ fn.patchStatsPayload = function(args)
 	if not st.aStat then
 		return args
 	end
-	for _, v in ipairs(args) do
+	for _, v in args do
 		if type(v) == "table" then
 			if v.misses ~= nil then
 				v.misses = 0
@@ -2887,7 +2887,7 @@ st.onAdd = function(Object)
 	end
 	local function Filter(iter, fn)
 		local t = {}
-		for _, v in pairs(iter) do
+		for _, v in iter do
 			local res = fn(v)
 			if res ~= nil then
 				t[#t + 1] = res
@@ -2928,7 +2928,7 @@ st.onAdd = function(Object)
 	end
 	local Map = Keys[#IncomingNotes] or {}
 	local Session = {}
-	for kn, kv in pairs(Map) do
+	for kn, kv in Map do
 		local bindObj = Keybinds[kv]
 		local bindValue = fn.resolveKeyName(bindObj and bindObj.Value or kv)
 		local code = fn.safeKeyCode(bindValue) or Enum.KeyCode.Space
@@ -2984,7 +2984,7 @@ st.onAdd = function(Object)
 	local laneCount = {}
 
 	st.rel = function()
-		for holderName, down in pairs(laneDown) do
+		for holderName, down in laneDown do
 			if down then
 				local code = Session[holderName]
 				if code then
@@ -2993,7 +2993,7 @@ st.onAdd = function(Object)
 				laneDown[holderName] = false
 			end
 		end
-		for k in pairs(laneCount) do
+		for k in laneCount do
 			laneCount[k] = 0
 		end
 	end
@@ -3029,7 +3029,7 @@ st.onAdd = function(Object)
 		fn.syncSlider(newValue)
 	end)
 
-	for _, Holder in pairs(IncomingNotes) do
+	for _, Holder in IncomingNotes do
 		connections:add(Holder.ChildAdded, function(Arrow)
 			task.defer(function()
 				if not Arrow or not Arrow.Visible then
@@ -3154,7 +3154,7 @@ st.regUi = function()
 		fn.applyMods(true)
 		local engine = existingEngine:FindFirstChild("Engine")
 		if engine then
-			for _, td in ipairs(fn.getDesc(engine)) do
+			for _, td in fn.getDesc(engine) do
 				fn.killTd(td)
 			end
 			local td = engine:FindFirstChild("TakeDamage")
@@ -3184,7 +3184,7 @@ end
 st.regUi()
 fn.scan()
 
-for _, v in pairs(fn.getDesc(workspace)) do
+for _, v in fn.getDesc(workspace) do
 	if v.ClassName == "ProximityPrompt" then
 		pcall(function()
 			v.HoldDuration = 0
