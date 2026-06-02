@@ -762,8 +762,11 @@ local ModifierList = {
 
 local modState = {}
 local ModApplyDelay = 0.5
+local ModClickDelay = 0.1
 local applyModsTok = 0
+local engineModsTok = 0
 local modTok = {}
+local modAppliedButton = {}
 
 fn.initModState = function()
 	for kind, names in ModifierList do
@@ -778,6 +781,18 @@ fn.initModState = function()
 end
 
 fn.initModState()
+
+fn.resetModState = function()
+	for kind, names in ModifierList do
+		local bucket = modState[kind]
+		if bucket then
+			for _, name in names do
+				bucket[name] = false
+				modAppliedButton[string.format("%s:%s", tostring(kind), tostring(name))] = nil
+			end
+		end
+	end
+end
 
 fn.pname = function()
 	local ok, info = pcall(svc.mps.GetProductInfo, svc.mps, game.PlaceId)
@@ -948,22 +963,57 @@ fn.findModButton = function(container, kind, name)
 	return nil
 end
 
-fn.getModButton = function(kind, name)
-	local engineGui = PlayerGui:FindFirstChild("FNFEngine")
-	local engine = engineGui and engineGui:FindFirstChild("Engine")
-	local button = fn.findModButton(engine and engine:FindFirstChild("Modifiers"), kind, name)
-	if button then
-		return button
+fn.getActualModifiers = function(timeout)
+	local deadline = os.clock() + (tonumber(timeout) or 0)
+	repeat
+		local gui = PlayerGui:FindFirstChild("GameUI")
+		local songSelect = gui and gui:FindFirstChild("SongSelect")
+		local modifiers = songSelect and songSelect:FindFirstChild("Modifiers")
+		local actual = modifiers and modifiers:FindFirstChild("ActualModifiers")
+		if actual then
+			return actual
+		end
+		if os.clock() >= deadline then
+			break
+		end
+		task.wait(0.1)
+	until false
+	return nil
+end
+
+fn.getActualModButton = function(kind, name, timeout)
+	local actual = fn.getActualModifiers(timeout)
+	local bucket = actual and actual:FindFirstChild(kind)
+	if bucket then
+		local direct = bucket:FindFirstChild(name)
+		local button = fn.asClickable(direct)
+		if button then
+			return button
+		end
 	end
-	local gui = PlayerGui:FindFirstChild("GameUI")
-	local ss = gui and gui:FindFirstChild("SongSelect")
-	local mods = ss and ss:FindFirstChild("Modifiers")
-	local act = mods and mods:FindFirstChild("ActualModifiers")
-	return fn.findModButton(act, kind, name)
+	return fn.findModButton(actual, kind, name)
+end
+
+fn.getModButton = function(kind, name)
+	return fn.getActualModButton(kind, name, 0)
 end
 
 fn.engineReady = function()
 	return PlayerGui:FindFirstChild("FNFEngine") ~= nil
+end
+
+fn.getSongPlaybackSpeed = function(song)
+	local parent = song and song.Parent
+	local sound = parent and parent:FindFirstChild("Sound")
+	local playbackSpeed = sound and sound:FindFirstChild("PlaybackSpeed")
+	return playbackSpeed and tonumber(playbackSpeed.Value) or 1
+end
+
+fn.getActiveScrollSpeed = function(song)
+	if Input.ScrollSpeedChange.Value then
+		return Input.ScrollSpeed.Value
+	end
+	return fn.getSongPlaybackSpeed(song)
 end
 
 fn.applyMod = function(kind, name, shouldEnable, force)
@@ -977,6 +1027,7 @@ fn.applyMod = function(kind, name, shouldEnable, force)
 	end
 	local desired = shouldEnable and true or false
 	local previous = stateBucket[name]
+	local stateKey = string.format("%s:%s", tostring(kind), tostring(name))
 	local needsToggle
 	if desired then
 		needsToggle = force or previous ~= true
@@ -984,17 +1035,22 @@ fn.applyMod = function(kind, name, shouldEnable, force)
 		needsToggle = previous == true
 	end
 	if not needsToggle then
-		return
+		return false
 	end
 	if not fn.engineReady() then
-		return
+		return false
 	end
 	local btn = fn.getModButton(kind, name)
 	if not btn then
-		return
+		return false
+	end
+	if desired and force and previous == true and modAppliedButton[stateKey] == btn then
+		return false
 	end
 	fn.guiClick(btn)
 	stateBucket[name] = desired
+	modAppliedButton[stateKey] = desired and btn or nil
+	return true
 end
 
 fn.queueModApply = function(kind, name, shouldEnable)
@@ -1018,21 +1074,70 @@ fn.applyMods = function(force)
 		if token ~= applyModsTok then
 			return
 		end
-		if not fn.engineReady() then
-			return
-		end
-		for kind, names in ModifierList do
-			local flags = AutoModFlags[kind]
-			local stateBucket = modState[kind]
-			for _, name in names do
-				local desired = false
-				if flags then
-					desired = flags[name] and true or false
-				end
-				if desired or stateBucket and stateBucket[name] then
-					fn.applyMod(kind, name, desired, force)
+		fn.applyModsNow(force)
+	end)
+end
+
+fn.applyModsNow = function(force)
+	if not fn.engineReady() then
+		return false
+	end
+	local clicked = false
+	for kind, names in ModifierList do
+		local flags = AutoModFlags[kind]
+		local stateBucket = modState[kind]
+		for _, name in names do
+			local desired = false
+			if flags then
+				desired = flags[name] and true or false
+			end
+			if desired or stateBucket and stateBucket[name] then
+				if fn.applyMod(kind, name, desired, force) then
+					clicked = true
 				end
 			end
+		end
+	end
+	return clicked
+end
+
+fn.applyModsSequential = function(force)
+	if not fn.engineReady() then
+		return false
+	end
+	local clicked = false
+	for kind, names in ModifierList do
+		local flags = AutoModFlags[kind]
+		local stateBucket = modState[kind]
+		for _, name in names do
+			local desired = false
+			if flags then
+				desired = flags[name] and true or false
+			end
+			if desired or stateBucket and stateBucket[name] then
+				if fn.applyMod(kind, name, desired, force) then
+					clicked = true
+					task.wait(ModClickDelay)
+				end
+			end
+		end
+	end
+	return clicked
+end
+
+fn.applyModsForEngine = function(engineGui)
+	if not engineGui then
+		return
+	end
+	engineModsTok += 1
+	local token = engineModsTok
+	fn.resetModState()
+	task.spawn(function()
+		task.wait(ModApplyDelay)
+		local endAt = os.clock() + 8
+		while token == engineModsTok and engineGui.Parent and PlayerGui:FindFirstChild("FNFEngine") == engineGui and os.clock() <= endAt do
+			fn.applyModsSequential(false)
+			task.wait(0.75)
 		end
 	end)
 end
@@ -1129,7 +1234,6 @@ fn.playSeq = function(Holder, Arrow, keyCode, AutoCtx)
 		end
 		if AutoCtx.laneDown[Holder] then
 			AutoCtx.release(Holder.Name, keyCode)
-			task.wait(math.max(0, AutoCtx.tapMs or 0) / 1000)
 		end
 		AutoCtx.press(Holder.Name, keyCode)
 		if type(AutoCtx.botScore) == "function" then
@@ -2906,12 +3010,7 @@ st.onAdd = function(Object)
 	end
 	fn.syncLullabyPurge(Engine)
 	local PoisonNotes
-	local scrollSpeed = Input.ScrollSpeedChange.Value and Input.ScrollSpeed.Value or (function()
-		local p = Song and Song.Parent
-		local s = p and p:FindFirstChild("Sound")
-		local ps = s and s:FindFirstChild("PlaybackSpeed")
-		return ps and tonumber(ps.Value) or 1
-	end)()
+	local scrollSpeed = fn.getActiveScrollSpeed(Song)
 	local baseOffset = fn.calcOff(scrollSpeed)
 	local sideValue = Object.Engine.PlayerSide.Value
 	local sideFolder = Object.Engine.Game:FindFirstChild(sideValue)
@@ -3056,7 +3155,7 @@ st.onAdd = function(Object)
 				AutoCtx.relMs = st.relMs
 				AutoCtx.holdTick = st.holdTick
 				AutoCtx.maxHold = st.maxHold
-				AutoCtx.baseOffset = fn.calcOff(Input.ScrollSpeedChange.Value and Input.ScrollSpeed.Value or 1)
+				AutoCtx.baseOffset = fn.calcOff(fn.getActiveScrollSpeed(Song))
 				fn.playSeq(Holder, Arrow, keyCode, AutoCtx)
 			end)
 		end)
@@ -3107,7 +3206,7 @@ st.regUi = function()
 	connections:add(PlayerGui.ChildAdded, function(o)
 		task.defer(function()
 			if o and o.Name == "FNFEngine" then
-				fn.applyMods(true)
+				fn.applyModsForEngine(o)
 			end
 			if o and o.Name == "GameUI" then
 				fn.bindSw()
@@ -3151,7 +3250,7 @@ st.regUi = function()
 	end)
 	local existingEngine = PlayerGui:FindFirstChild("FNFEngine")
 	if existingEngine then
-		fn.applyMods(true)
+		fn.applyModsForEngine(existingEngine)
 		local engine = existingEngine:FindFirstChild("Engine")
 		if engine then
 			for _, td in fn.getDesc(engine) do
