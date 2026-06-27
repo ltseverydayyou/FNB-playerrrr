@@ -92,7 +92,7 @@ fn.getDesc = function(root)
 		return resQ
 	end
 	local okG, resG = pcall(function()
-		return root:GetDescendants()
+		return root:QueryDescendants("Instance")
 	end)
 	if okG and type(resG) == "table" then
 		return resG
